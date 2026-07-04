@@ -1,11 +1,16 @@
 import json
+import os
 import sys
+import traceback
 from openai import AsyncOpenAI
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from app.config import settings
 from app.services.conversation_store import load_session, save_session
 from typing import AsyncGenerator
+
+# Project root = Inter_Generational_Solidarity/
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 glm_client = AsyncOpenAI(
     api_key=settings.GLM_API_KEY,
@@ -32,9 +37,15 @@ Rules:
 - After a successful tool call, tell the user their request is submitted and volunteers will be notified.
 """
 
+# Inject PROJECT_ROOT into PYTHONPATH so the subprocess can find mcp_server on Windows
+_env = dict(os.environ)
+_existing_path = _env.get("PYTHONPATH", "")
+_env["PYTHONPATH"] = f"{PROJECT_ROOT}{os.pathsep}{_existing_path}" if _existing_path else PROJECT_ROOT
+
 MCP_SERVER_PARAMS = StdioServerParameters(
     command=sys.executable,
-    args=["-m", "mcp_server.server"]
+    args=["-m", "mcp_server.server"],
+    env=_env
 )
 
 async def stream_agent_response(
@@ -154,7 +165,8 @@ async def stream_agent_response(
                 yield f"data: [DONE] request_created={request_created}\n\n"
 
     except Exception as e:
-        yield f"data: [ERROR] Agent error: {str(e)}\n\n"
+        yield f"data: [ERROR] Agent error: {type(e).__name__}: {str(e)}\n\n"
+        yield f"data: [ERROR] Traceback: {traceback.format_exc()}\n\n"
 
     finally:
         # Always persist — even if the stream failed mid-way
