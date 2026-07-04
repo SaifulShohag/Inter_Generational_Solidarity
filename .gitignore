@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+.vibeforall/
 
 # Python
 __pycache__/
@@ -37,3 +38,16 @@ conversations/*.json
 *.log
 .vscode/
 .idea/
+
+# Frontend — Node
+vibeforall/node_modules/
+
+# Frontend — build output
+vibeforall/dist/
+
+# Frontend — Vite cache
+vibeforall/.vite/
+
+# OS
+.DS_Store
+Thumbs.db

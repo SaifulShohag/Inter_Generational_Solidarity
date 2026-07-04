@@ -501,7 +501,7 @@
                     const lines = eventBlock.split("\n");
                     for (const line of lines) {
                         if (!line.startsWith("data:")) continue;
-                        const content = line.slice(5).trimStart();
+                        const content = line.startsWith("data: ") ? line.slice(6) : line.slice(5);
                         if (content.startsWith("[DONE]")) {
                             continue;
                         }
@@ -519,7 +519,7 @@
                 const lines = buffer.split("\n");
                 for (const line of lines) {
                     if (!line.startsWith("data:")) continue;
-                    const content = line.slice(5).trimStart();
+                    const content = line.startsWith("data: ") ? line.slice(6) : line.slice(5);
                     if (content.startsWith("[DONE]")) continue;
                     if (content.startsWith("[ERROR]")) {
                         throw new Error(content);
