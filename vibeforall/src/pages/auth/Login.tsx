@@ -1,0 +1,156 @@
+import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Heart, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import type { UserRole } from '../../types';
+
+export function Login() {
+  const [params] = useSearchParams();
+  const role = (params.get('role') || 'volunteer') as UserRole;
+  const navigate = useNavigate();
+  const { login } = useApp();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const isVolunteer = role === 'volunteer';
+  const accentClass = isVolunteer ? 'text-accent' : 'text-success';
+  const bgClass = isVolunteer ? 'bg-accent-light' : 'bg-success-light';
+  const emoji = isVolunteer ? '🤝' : '👴';
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 1000));
+    login(role);
+    navigate(role === 'volunteer' ? '/volunteer' : '/elderly');
+  };
+
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 800));
+    login(role);
+    navigate(role === 'volunteer' ? '/volunteer' : '/elderly');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-warm-100 flex items-center justify-center p-6">
+      <div className="w-full max-w-md animate-slide-up">
+        {/* Retour */}
+        <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-8 transition-colors font-medium group">
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          Retour
+        </button>
+
+        {/* En-tête */}
+        <div className="text-center mb-8">
+          <div className={`w-16 h-16 ${bgClass} rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4`}>
+            {emoji}
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">Bon retour !</h1>
+          <p className="text-gray-500">
+            Connexion en tant que{' '}
+            <span className={`font-semibold ${accentClass}`}>
+              {isVolunteer ? 'Bénévole' : 'Senior'}
+            </span>
+          </p>
+        </div>
+
+        {/* Formulaire */}
+        <div className="bg-white rounded-3xl shadow-card p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
+              label="Adresse e-mail"
+              type="email"
+              placeholder="vous@email.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              icon={<Mail className="w-4 h-4" />}
+              required
+              autoComplete="email"
+            />
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-gray-700">Mot de passe</label>
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Votre mot de passe"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="w-full pl-11 pr-11 py-3 rounded-2xl border border-gray-200 text-gray-800 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all duration-200 text-base hover:border-gray-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button type="button" className={`text-sm font-medium ${accentClass} hover:underline`}>
+                Mot de passe oublié ?
+              </button>
+            </div>
+
+            <Button type="submit" fullWidth size="lg" loading={loading}>
+              Se connecter
+            </Button>
+          </form>
+
+          <div className="mt-4 relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-100" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-3 bg-white text-gray-400">ou</span>
+            </div>
+          </div>
+
+          <Button
+            variant="secondary"
+            fullWidth
+            size="lg"
+            onClick={handleDemoLogin}
+            className="mt-4"
+            icon={<span className="text-lg">{emoji}</span>}
+          >
+            Continuer en mode démo {isVolunteer ? 'Bénévole' : 'Senior'}
+          </Button>
+
+          <p className="text-center mt-6 text-gray-500 text-sm">
+            Pas encore de compte ?{' '}
+            <button className={`font-semibold ${accentClass} hover:underline`}>
+              Créer un compte
+            </button>
+          </p>
+        </div>
+
+        {/* Indicateurs de confiance */}
+        <div className="mt-6 flex justify-center gap-5 text-xs text-gray-400">
+          <div className="flex items-center gap-1.5">
+            <Lock className="w-3 h-3" />
+            <span>Sécurisé & Privé</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Heart className="w-3 h-3" />
+            <span>100% Gratuit</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
