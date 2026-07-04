@@ -1,16 +1,12 @@
 import json
-import os
-import sys
+import uuid
 import traceback
+from datetime import datetime
 from openai import AsyncOpenAI
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 from app.config import settings
 from app.services.conversation_store import load_session, save_session
 from typing import AsyncGenerator
-
-# Project root = Inter_Generational_Solidarity/
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from mcp_server.tools.request_tools import create_help_request, get_request_status
 
 glm_client = AsyncOpenAI(
     api_key=settings.GLM_API_KEY,
@@ -37,16 +33,122 @@ Rules:
 - After a successful tool call, tell the user their request is submitted and volunteers will be notified.
 """
 
-# Inject PROJECT_ROOT into PYTHONPATH so the subprocess can find mcp_server on Windows
-_env = dict(os.environ)
-_existing_path = _env.get("PYTHONPATH", "")
-_env["PYTHONPATH"] = f"{PROJECT_ROOT}{os.pathsep}{_existing_path}" if _existing_path else PROJECT_ROOT
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "create_help_request",
+            "description": (
+                "Save a completed help request to the database. "
+                "Call ONLY when ALL fields are confirmed by the user: "
+                "title, description, category, scheduled_at (ISO datetime), location_text."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title":         {"type": "string"},
+                    "description":   {"type": "string"},
+                    "category":      {
+                        "type": "string",
+                        "enum": ["medical", "grocery", "cleaning", "transport", "other"]
+                    },
+                    "scheduled_at":  {
+                        "type": "string",
+                        "description": "ISO datetime e.g. 2026-07-10T14:00:00"
+                    },
+                    "location_text": {"type": "string"},
+                },
+                "required": ["title", "description", "category", "scheduled_at", "location_text"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_request_status",
+            "description": "Check the current status of a help request by its ID.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "request_id": {"type": "string"}
+                },
+                "required": ["request_id"]
+            }
+        }
+    }
+]
 
-MCP_SERVER_PARAMS = StdioServerParameters(
-    command=sys.executable,
-    args=["-m", "mcp_server.server"],
-    env=_env
-)
+
+def _build_system_prompt() -> str:
+    now = datetime.now().astimezone().replace(microsecond=0)
+    return (
+        SYSTEM_PROMPT
+        + "\n\n"
+        + "Current date and time context:\n"
+        + f"- Today is {now.date().isoformat()}.\n"
+        + f"- Current local time is {now.isoformat()}.\n"
+        + "- Interpret relative phrases like today, tomorrow, tonight, and next Monday using this date.\n"
+        + "- If the user says a time only, assume it refers to today unless they say otherwise.\n"
+    )
+
+
+def _normalize_tool_messages(messages: list[dict]) -> list[dict]:
+    normalized: list[dict] = []
+    pending_ids: list[str] = []
+
+    for msg in messages:
+        role = msg.get("role")
+
+        if role == "assistant" and msg.get("tool_calls"):
+            tool_calls = []
+            for i, tc in enumerate(msg.get("tool_calls", [])):
+                fn = tc.get("function") or {}
+                name = fn.get("name")
+                args = fn.get("arguments")
+                if not name or args is None:
+                    continue
+                tc_id = tc.get("id") or f"call_{i}_{uuid.uuid4().hex}"
+                tool_calls.append({
+                    "id": tc_id,
+                    "type": tc.get("type") or "function",
+                    "function": {"name": name, "arguments": args},
+                })
+            clean = {"role": "assistant", "content": msg.get("content")}
+            if tool_calls:
+                clean["tool_calls"] = tool_calls
+                pending_ids = [tc["id"] for tc in tool_calls]
+            else:
+                pending_ids = []
+            normalized.append(clean)
+            continue
+
+        if role == "tool":
+            tc_id = msg.get("tool_call_id")
+            if not tc_id and pending_ids:
+                tc_id = pending_ids.pop(0)
+            if not tc_id:
+                continue
+            normalized.append({
+                "role": "tool",
+                "tool_call_id": tc_id,
+                "content": msg.get("content", ""),
+            })
+            continue
+
+        normalized.append(msg)
+
+    return normalized
+
+
+async def _call_tool(name: str, args: dict, user_id: int) -> str:
+    if name == "create_help_request":
+        clean = {k: v for k, v in args.items() if v is not None and k not in {"user_id", "latitude", "longitude"}}
+        clean["user_id"] = str(user_id)
+        return await create_help_request(**clean)
+    if name == "get_request_status":
+        return await get_request_status(**args)
+    return json.dumps({"ok": False, "message": f"Unknown tool '{name}'"})
+
 
 async def stream_agent_response(
     session_id: str,
@@ -59,115 +161,99 @@ async def stream_agent_response(
         return
 
     session["messages"].append({"role": "user", "content": user_message})
+    session["messages"] = _normalize_tool_messages(session["messages"])
+    system_prompt = _build_system_prompt()
 
     try:
-        async with stdio_client(MCP_SERVER_PARAMS) as (read, write):
-            async with ClientSession(read, write) as mcp_session:
-                await mcp_session.initialize()
+        stream = await glm_client.chat.completions.create(
+            model=settings.GLM_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                *session["messages"],
+            ],
+            tools=TOOLS,
+            tool_choice="auto",
+            stream=True,
+        )
 
-                # Fetch available tools from MCP and convert to OpenAI format
-                mcp_tools_result = await mcp_session.list_tools()
-                tools = [
+        full_reply = ""
+        tool_calls_buffer = []
+
+        async for chunk in stream:
+            delta = chunk.choices[0].delta
+
+            if delta.content:
+                full_reply += delta.content
+                yield f"data: {delta.content}\n\n"
+
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    if tc.index >= len(tool_calls_buffer):
+                        tool_calls_buffer.append({"id": "", "type": "function", "name": "", "arguments": ""})
+                    if getattr(tc, "id", None):
+                        tool_calls_buffer[tc.index]["id"] = tc.id
+                    if tc.function.name:
+                        tool_calls_buffer[tc.index]["name"] = tc.function.name
+                    if tc.function.arguments:
+                        tool_calls_buffer[tc.index]["arguments"] += tc.function.arguments
+
+        if tool_calls_buffer:
+            session["messages"].append({
+                "role": "assistant",
+                "content": full_reply or None,
+                "tool_calls": [
                     {
-                        "type": "function",
-                        "function": {
-                            "name":        t.name,
-                            "description": t.description,
-                            "parameters":  t.inputSchema
-                        }
+                        "id":       tc["id"],
+                        "type":     "function",
+                        "function": {"name": tc["name"], "arguments": tc["arguments"]},
                     }
-                    for t in mcp_tools_result.tools
-                ]
+                    for tc in tool_calls_buffer if tc.get("name")
+                ],
+            })
 
-                # First GLM call — streaming
-                stream = await glm_client.chat.completions.create(
-                    model=settings.GLM_MODEL,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        *session["messages"]
-                    ],
-                    tools=tools,
-                    tool_choice="auto",
-                    stream=True
-                )
+            for tc in tool_calls_buffer:
+                args = json.loads(tc["arguments"])
+                result_text = await _call_tool(tc["name"], args, user_id)
+                result_data = json.loads(result_text)
 
-                full_reply       = ""
-                tool_calls_buffer = []
+                if tc["name"] == "create_help_request" and result_data.get("ok"):
+                    session["request_id"] = result_data.get("request_id")
+                    session["status"] = "completed"
 
-                async for chunk in stream:
-                    delta = chunk.choices[0].delta
+                session["messages"].append({
+                    "role":         "tool",
+                    "tool_call_id": tc["id"],
+                    "name":         tc["name"],
+                    "content":      result_text,
+                })
 
-                    # Stream text tokens to the client
-                    if delta.content:
-                        full_reply += delta.content
-                        yield f"data: {delta.content}\n\n"
+            final_stream = await glm_client.chat.completions.create(
+                model=settings.GLM_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    *session["messages"],
+                ],
+                stream=True,
+            )
 
-                    # Accumulate tool call fragments across streamed chunks
-                    if delta.tool_calls:
-                        for tc in delta.tool_calls:
-                            if tc.index >= len(tool_calls_buffer):
-                                tool_calls_buffer.append({"name": "", "arguments": ""})
-                            if tc.function.name:
-                                tool_calls_buffer[tc.index]["name"] = tc.function.name
-                            if tc.function.arguments:
-                                tool_calls_buffer[tc.index]["arguments"] += tc.function.arguments
+            final_reply = ""
+            async for chunk in final_stream:
+                if chunk.choices[0].delta.content:
+                    token = chunk.choices[0].delta.content
+                    final_reply += token
+                    yield f"data: {token}\n\n"
 
-                # Handle tool calls after stream ends
-                if tool_calls_buffer:
-                    session["messages"].append({
-                        "role":       "assistant",
-                        "content":    full_reply or None,
-                        "tool_calls": tool_calls_buffer
-                    })
+            session["messages"].append({"role": "assistant", "content": final_reply})
 
-                    for tc in tool_calls_buffer:
-                        args = json.loads(tc["arguments"])
-                        args["user_id"] = str(user_id)   # always inject the authenticated user_id
+        else:
+            session["messages"].append({"role": "assistant", "content": full_reply})
 
-                        tool_result = await mcp_session.call_tool(tc["name"], args)
-                        result_text = tool_result.content[0].text
-                        result_data = json.loads(result_text)
-
-                        # Track the created request_id in the session
-                        if tc["name"] == "create_help_request" and result_data.get("ok"):
-                            session["request_id"] = result_data.get("request_id")
-                            session["status"]     = "completed"
-
-                        session["messages"].append({
-                            "role":    "tool",
-                            "name":    tc["name"],
-                            "content": result_text
-                        })
-
-                    # Second GLM call — get the final user-facing reply after tool result
-                    final_stream = await glm_client.chat.completions.create(
-                        model=settings.GLM_MODEL,
-                        messages=[
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            *session["messages"]
-                        ],
-                        stream=True
-                    )
-
-                    final_reply = ""
-                    async for chunk in final_stream:
-                        if chunk.choices[0].delta.content:
-                            token = chunk.choices[0].delta.content
-                            final_reply += token
-                            yield f"data: {token}\n\n"
-
-                    session["messages"].append({"role": "assistant", "content": final_reply})
-
-                else:
-                    session["messages"].append({"role": "assistant", "content": full_reply})
-
-                request_created = session.get("request_id") is not None
-                yield f"data: [DONE] request_created={request_created}\n\n"
+        request_created = session.get("request_id") is not None
+        yield f"data: [DONE] request_created={request_created}\n\n"
 
     except Exception as e:
         yield f"data: [ERROR] Agent error: {type(e).__name__}: {str(e)}\n\n"
         yield f"data: [ERROR] Traceback: {traceback.format_exc()}\n\n"
 
     finally:
-        # Always persist — even if the stream failed mid-way
         await save_session(session_id, session)

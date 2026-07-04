@@ -630,21 +630,34 @@
         });
 
         ensureAuth();
-        if (!getSessionId()) {
-            sessionLabel.textContent = "No session yet. Click Start session.";
-            messageInput.disabled = true;
-            sendBtn.disabled = true;
-            micBtn.disabled = true;
-            startSession().catch((error) => {
-                setStatus(error.message, "error");
-            });
-        } else {
-            sessionLabel.textContent = `Session: ${getSessionId()}`;
-            messageInput.disabled = false;
-            sendBtn.disabled = false;
-            micBtn.disabled = !recognition;
-            setStatus("Session restored from browser storage.", "ok");
-        }
+        (async () => {
+            const stored = getSessionId();
+            if (stored) {
+                // Verify the session still exists on the server
+                const check = await fetch(`${API_BASE}/conversations/${stored}/history`, {
+                    headers: { "Authorization": `Bearer ${getToken()}` }
+                });
+                if (!check.ok) {
+                    localStorage.removeItem(SESSION_KEY);
+                }
+            }
+
+            if (!getSessionId()) {
+                sessionLabel.textContent = "No session yet. Click Start session.";
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+                micBtn.disabled = false;
+                startSession().catch((error) => {
+                    setStatus(error.message, "error");
+                });
+            } else {
+                sessionLabel.textContent = `Session: ${getSessionId()}`;
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                micBtn.disabled = false;
+                setStatus("Session restored from browser storage.", "ok");
+            }
+        })();
     </script>
 </body>
 </html>
