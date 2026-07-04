@@ -27,6 +27,60 @@ Inter_Generational_Solidarity/
 
 ---
 
+## Running with Docker (Recommended)
+
+Docker is the easiest way to run the backend — no Python, no virtual environment, works the same on Windows, Mac, and Linux.
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+### 1. Create the `.env` file
+
+Copy the example and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+SECRET_KEY=your-secret-key-here        # any long random string
+DATABASE_URL=sqlite+aiosqlite:///./helpme.db  # leave as-is
+OPENAI_API_KEY=your-api-key-here       # Groq / ZhipuAI / any OpenAI-compatible key
+OPENAI_BASE_URL=https://api.groq.com/openai/v1
+LLM_MODEL_NAME=llama-3.1-8b-instant
+```
+
+### 2. Build and start
+
+```bash
+docker compose up --build
+```
+
+The first run builds the image and runs database migrations automatically.
+Subsequent runs just need:
+
+```bash
+docker compose up
+```
+
+### 3. Open the app
+
+- **Simple HTML frontend:** http://localhost:8000
+- **API docs (Swagger):** http://localhost:8000/docs
+
+### Stop
+
+```bash
+docker compose down
+```
+
+Data (database + conversation sessions) is stored in a Docker volume and survives restarts.
+
+---
+
 ## Backend Setup (Python / FastAPI)
 
 ### Prerequisites
@@ -151,7 +205,7 @@ npm run preview
    - Description of the task
    - Date and time
    - Location
-3. **MCP server** exposes a `create_help_request` tool that the AI calls once all details are confirmed
+3. **AI agent** calls `create_help_request` directly once all details are confirmed
 4. **Help request** is saved to the database with status `PENDING`
 5. **Volunteers** browse open requests and accept missions
 6. After completion, both parties can leave a review
@@ -185,8 +239,8 @@ Full interactive docs available at **http://localhost:8000/docs** when the serve
 | Database | SQLite (async via aiosqlite + SQLAlchemy) |
 | Migrations | Alembic |
 | Auth | JWT (python-jose + passlib/bcrypt) |
-| AI Model | GLM-4-Flash (ZhipuAI, OpenAI-compatible) |
-| Agent tooling | MCP (Model Context Protocol) |
+| AI Model | GLM-4-Flash / Llama 3 (any OpenAI-compatible API) |
+| Agent tooling | Tool calling via OpenAI-compatible streaming API |
 | Frontend | React 18 + TypeScript + Vite |
 | Styling | Tailwind CSS v3 |
 | Charts | Recharts |
