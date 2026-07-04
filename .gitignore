@@ -48,6 +48,10 @@ vibeforall/dist/
 # Frontend — Vite cache
 vibeforall/.vite/
 
+# Backend — local dev database and sessions
+backend/helpme.db
+backend/conversations/
+
 # OS
 .DS_Store
 Thumbs.db

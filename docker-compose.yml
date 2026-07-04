@@ -1,8 +1,8 @@
 services:
-  api:
-    build: .
-    ports:
-      - "8000:8000"
+  backend:
+    build: ./backend
+    expose:
+      - "8000"
     env_file:
       - .env
     environment:
@@ -10,6 +10,17 @@ services:
       CONVERSATIONS_DIR: /data/conversations
     volumes:
       - app_data:/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./vibeforall
+      args:
+        VITE_API_URL: ""
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:

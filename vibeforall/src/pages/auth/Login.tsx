@@ -11,7 +11,7 @@ export function Login() {
   const [params] = useSearchParams();
   const role = (params.get('role') || 'volunteer') as UserRole;
   const navigate = useNavigate();
-  const { login, loginWithApi } = useApp();
+  const { loginWithApi } = useApp();
 
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
@@ -43,11 +43,6 @@ export function Login() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoLogin = () => {
-    login(role);
-    navigate(destination);
   };
 
   return (
@@ -142,26 +137,6 @@ export function Login() {
               {mode === 'login' ? 'Se connecter' : "S'inscrire"}
             </Button>
           </form>
-
-          <div className="mt-4 relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-100" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-white text-gray-400">ou</span>
-            </div>
-          </div>
-
-          <Button
-            variant="secondary"
-            fullWidth
-            size="lg"
-            onClick={handleDemoLogin}
-            className="mt-4"
-            icon={<span className="text-lg">{emoji}</span>}
-          >
-            Continuer en mode démo {isVolunteer ? 'Bénévole' : 'Senior'}
-          </Button>
 
           <p className="text-center mt-6 text-gray-500 text-sm">
             {mode === 'login' ? 'Pas encore de compte ?' : 'Déjà un compte ?'}{' '}

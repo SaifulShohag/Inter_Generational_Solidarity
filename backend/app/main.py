@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.services.database import engine, Base
 from app.routers import auth, conversations, location, reviews
 from app.routers import help_requests   # explicit import avoids shadowing stdlib 'requests'
-from fastapi.staticfiles import StaticFiles
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,5 +30,3 @@ app.include_router(reviews.router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-app.mount("/", StaticFiles(directory="static", html=True), name="static")

@@ -1,0 +1,13 @@
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+helpme.db
+*.db
+conversations/
