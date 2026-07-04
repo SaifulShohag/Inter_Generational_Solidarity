@@ -3,6 +3,49 @@
 
 ---
 
+## 🖥️ Getting Started
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) v18 or higher
+- npm (comes with Node.js)
+
+### Installation & Running
+
+```bash
+# 1. Navigate to the app directory
+cd vibeforall
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the development server
+npm run dev
+```
+
+The app will be available at **http://localhost:5173**
+
+### Other Commands
+
+```bash
+# Type-check the project
+npx tsc --noEmit
+
+# Build for production
+npm run build
+
+# Preview the production build
+npm run preview
+```
+
+### Demo Login
+
+On the login screen, select a role and use the **demo login** button — no credentials needed.
+
+- **Bénévole (Volunteer)** — access the volunteer dashboard, missions, statistics, and history
+- **Senior** — access the elderly home screen with AI voice and chat assistants
+
+---
+
 ## 📋 Executive Summary
 
 The **Inter-GenAIrational Solidarity** platform is a hyper-local community assistance network designed to mitigate social isolation and mobility barriers among older demographics.By leveraging Generative AI, the platform eliminates technical barriers for seniors, seamlessly transforming natural voice or accessible text inputs into actionable local volunteer opportunities.
