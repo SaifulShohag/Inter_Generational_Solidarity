@@ -42,8 +42,8 @@ export interface Mission {
   urgency: MissionUrgency;
   requiredSkills: string[];
   elderlyName: string;
-  elderlyAvatar: string;
-  elderlyAge: number;
+  elderlyAvatar?: string;
+  elderlyAge?: number;
   status: MissionStatus;
   missionType: 'immediate' | 'scheduled';
   contactInfo?: string;

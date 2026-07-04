@@ -93,6 +93,18 @@ def _build_system_prompt() -> str:
     )
 
 
+def _trim_messages(messages: list[dict], max_messages: int = 16) -> list[dict]:
+    """Keep only the most recent messages to avoid exceeding the model context window.
+    Always starts from a user message to avoid sending a partial tool-call pair."""
+    if len(messages) <= max_messages:
+        return messages
+    trimmed = messages[-max_messages:]
+    for i, msg in enumerate(trimmed):
+        if msg["role"] == "user":
+            return trimmed[i:]
+    return trimmed
+
+
 def _normalize_tool_messages(messages: list[dict]) -> list[dict]:
     normalized: list[dict] = []
     pending_ids: list[str] = []
@@ -170,7 +182,7 @@ async def stream_agent_response(
             model=settings.GLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
-                *session["messages"],
+                *_trim_messages(session["messages"]),
             ],
             tools=TOOLS,
             tool_choice="auto",
@@ -232,7 +244,7 @@ async def stream_agent_response(
                 model=settings.GLM_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    *session["messages"],
+                    *_trim_messages(session["messages"]),
                 ],
                 stream=True,
             )

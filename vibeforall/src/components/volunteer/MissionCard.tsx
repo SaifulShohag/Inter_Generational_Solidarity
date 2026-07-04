@@ -89,7 +89,7 @@ export function MissionCard({ mission, onAccept, onDecline, onClick, compact }: 
         <Avatar src={mission.elderlyAvatar} name={mission.elderlyName} size="sm" />
         <div className="min-w-0">
           <p className="font-semibold text-gray-800 text-sm">{mission.elderlyName}</p>
-          <p className="text-xs text-gray-500">{mission.elderlyAge} ans • {mission.publishedAt}</p>
+          <p className="text-xs text-gray-500">{mission.elderlyAge ? `${mission.elderlyAge} ans • ` : ''}{mission.publishedAt}</p>
         </div>
         {onClick && (
           <ChevronRight className="w-4 h-4 text-gray-400 ml-auto group-hover:text-accent transition-colors" />

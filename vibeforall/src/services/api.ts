@@ -77,6 +77,54 @@ export async function apiSendMessage(
   return res.body.getReader();
 }
 
+// ── Help Requests ────────────────────────────────────────────────────────────
+
+export interface HelpRequestApi {
+  id: number;
+  requester_id: number;
+  requester_name: string | null;
+  title: string;
+  description: string;
+  category: 'medical' | 'grocery' | 'cleaning' | 'transport' | 'other';
+  scheduled_at: string;
+  location_text: string;
+  latitude: number | null;
+  longitude: number | null;
+  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssignedMissionApi extends HelpRequestApi {
+  accepted_at: string;
+  completed_at: string | null;
+}
+
+export async function apiGetMissions(token: string): Promise<HelpRequestApi[]> {
+  const res = await fetch(`${API_BASE}/requests?status=pending&limit=50`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<HelpRequestApi[]>(res);
+}
+
+export async function apiGetMyAssignments(token: string): Promise<AssignedMissionApi[]> {
+  const res = await fetch(`${API_BASE}/requests/assigned-to-me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse<AssignedMissionApi[]>(res);
+}
+
+export async function apiAcceptMission(token: string, requestId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/requests/${requestId}/accept`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ eta_minutes: 0 }),
+  });
+  await handleResponse(res);
+}
+
+// ── SSE streaming ─────────────────────────────────────────────────────────────
+
 export async function* streamResponse(
   reader: ReadableStreamDefaultReader<Uint8Array>,
 ): AsyncGenerator<string> {
@@ -95,7 +143,8 @@ export async function* streamResponse(
       for (const line of block.split('\n')) {
         if (!line.startsWith('data:')) continue;
         const content = line.startsWith('data: ') ? line.slice(6) : line.slice(5);
-        if (content.startsWith('[DONE]') || content.startsWith('[ERROR]')) continue;
+        if (content.startsWith('[DONE]')) continue;
+        if (content.startsWith('[ERROR]')) throw new Error(content.slice(7).trim() || 'Agent error');
         yield content;
       }
       boundary = buffer.indexOf('\n\n');

@@ -48,13 +48,33 @@ export function Voice() {
   const speakReply = (reply: string) => {
     if (!reply || !window.speechSynthesis) { setIsSpeaking(false); return; }
     window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(reply);
-    utt.lang = 'fr-FR';
-    utt.rate = 0.9;
-    utt.onend = () => setIsSpeaking(false);
-    utt.onerror = () => setIsSpeaking(false);
     setIsSpeaking(true);
-    window.speechSynthesis.speak(utt);
+
+    // Chrome silently drops utterances longer than ~200 chars — split into sentences
+    const sentences = reply
+      .split(/(?<=[.!?])\s+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (sentences.length === 0) { setIsSpeaking(false); return; }
+
+    let idx = 0;
+    const speakNext = () => {
+      if (idx >= sentences.length || stoppedRef.current) {
+        setIsSpeaking(false);
+        return;
+      }
+      const utt = new SpeechSynthesisUtterance(sentences[idx++]);
+      utt.lang = 'fr-FR';
+      utt.rate = 0.9;
+      utt.onend = speakNext;
+      utt.onerror = () => setIsSpeaking(false);
+      // resume() prevents Chrome's synthesis queue from hanging after cancel()
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utt);
+    };
+
+    // Let cancel() drain before starting
+    setTimeout(speakNext, 100);
   };
 
   const sendToAI = async (message: string) => {
@@ -78,7 +98,9 @@ export function Voice() {
       if (!stoppedRef.current) speakReply(reply);
     } catch {
       setIsProcessing(false);
-      setAiResponse("Désolé, une erreur est survenue. Veuillez réessayer.");
+      const errMsg = "Désolé, une erreur est survenue. Veuillez réessayer.";
+      setAiResponse(errMsg);
+      speakReply(errMsg);
     }
   };
 
