@@ -19,7 +19,6 @@ async def list_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "user_id":       {"type": "string"},
                     "title":         {"type": "string"},
                     "description":   {"type": "string"},
                     "category":      {
@@ -30,11 +29,9 @@ async def list_tools() -> list[types.Tool]:
                         "type": "string",
                         "description": "ISO datetime e.g. 2026-07-10T14:00:00"
                     },
-                    "location_text": {"type": "string"},
-                    "latitude":      {"type": "number"},
-                    "longitude":     {"type": "number"}
+                    "location_text": {"type": "string"}
                 },
-                "required": ["user_id", "title", "description", "category", "scheduled_at", "location_text"]
+                "required": ["title", "description", "category", "scheduled_at", "location_text"]
             }
         ),
         types.Tool(

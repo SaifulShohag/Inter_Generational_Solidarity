@@ -17,7 +17,7 @@ async def create_help_request(
     try:
         parsed_dt = datetime.fromisoformat(scheduled_at)
         if parsed_dt.tzinfo is None:
-            parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+            parsed_dt = parsed_dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
     except ValueError:
         return json.dumps({
             "ok": False,
