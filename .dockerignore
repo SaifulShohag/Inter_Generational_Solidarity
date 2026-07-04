@@ -1,0 +1,38 @@
+# Local Virtual Environments and Node Modules
+venv/
+.venv/
+backend/venv/
+vibeforall/node_modules/
+
+# Local Build Artifacts
+vibeforall/dist/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local Data and State (Docker uses volumes instead)
+*.db
+*.db-journal
+*.sqlite3
+data/
+conversations/
+
+# Version Control and IDEs
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Docker files themselves (Not needed inside the image build context)
+docker-compose.yml
+.dockerignore
