@@ -1,0 +1,10 @@
+.vibeforall/
+vibeforall/
+.git/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+helpme.db
+conversations/
+.env
