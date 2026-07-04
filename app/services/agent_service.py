@@ -8,9 +8,9 @@ from app.services.conversation_store import load_session, save_session
 from typing import AsyncGenerator
 from mcp_server.tools.request_tools import create_help_request, get_request_status
 
-glm_client = AsyncOpenAI(
-    api_key=settings.GLM_API_KEY,
-    base_url=settings.GLM_BASE_URL
+llm_client = AsyncOpenAI(
+    api_key=settings.LLM_API_KEY,
+    base_url=settings.LLM_BASE_URL
 )
 
 SYSTEM_PROMPT = """
@@ -30,6 +30,7 @@ Rules:
 - Ask only 1-2 questions per message. Never overwhelm.
 - Use simple, friendly language. No jargon.
 - Confirm ALL collected details with the user before calling create_help_request.
+- If the user mentions urgency or time sensitivity, set priority accordingly (low/medium/urgent). Otherwise default to medium.
 - Do NOT call create_help_request until every required field is confirmed.
 - After a successful tool call, tell the user their request is submitted and volunteers will be notified.
 """
@@ -42,7 +43,7 @@ TOOLS = [
             "description": (
                 "Save a completed help request to the database. "
                 "Call ONLY when ALL fields are confirmed by the user: "
-                "title, description, category, scheduled_at (ISO datetime), location_text."
+                "title, description, category, scheduled_at (ISO datetime), location_text, priority."
             ),
             "parameters": {
                 "type": "object",
@@ -53,13 +54,18 @@ TOOLS = [
                         "type": "string",
                         "enum": ["medical", "grocery", "cleaning", "transport", "other"]
                     },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["low", "medium", "urgent"],
+                        "description": "How urgent is this request? low = flexible timing, medium = within a day or two, urgent = as soon as possible"
+                    },
                     "scheduled_at":  {
                         "type": "string",
                         "description": "ISO datetime e.g. 2026-07-10T14:00:00"
                     },
                     "location_text": {"type": "string"},
                 },
-                "required": ["title", "description", "category", "scheduled_at", "location_text"]
+                "required": ["title", "description", "category", "scheduled_at", "location_text", "priority"]
             }
         }
     },
@@ -166,16 +172,16 @@ async def stream_agent_response(
     system_prompt = _build_system_prompt()
 
     try:
-        stream = await glm_client.chat.completions.create(
-            model=settings.GLM_MODEL,
+        stream = await llm_client.chat.completions.create(
+            model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
-                *session["messages"],
+                *session["messages"], # type: ignore
             ],
-            tools=TOOLS,
+            tools=TOOLS, # type: ignore
             tool_choice="auto",
             stream=True,
-        )
+        ) # type: ignore
 
         full_reply = ""
         tool_calls_buffer = []
@@ -228,14 +234,14 @@ async def stream_agent_response(
                     "content":      result_text,
                 })
 
-            final_stream = await glm_client.chat.completions.create(
-                model=settings.GLM_MODEL,
+            final_stream = await llm_client.chat.completions.create(
+                model=settings.LLM_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    *session["messages"],
+                    *session["messages"], # type: ignore
                 ],
                 stream=True,
-            )
+            ) # type: ignore
 
             final_reply = ""
             async for chunk in final_stream:

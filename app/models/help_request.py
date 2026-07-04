@@ -18,6 +18,11 @@ class RequestStatus(str, enum.Enum):
     COMPLETED   = "completed"
     CANCELLED   = "cancelled"
 
+class RequestPriority(str, enum.Enum):
+    LOW    = "low"
+    MEDIUM = "medium"
+    URGENT = "urgent"
+
 class HelpRequest(Base):
     __tablename__ = "help_requests"
 
@@ -27,6 +32,10 @@ class HelpRequest(Base):
     description:   Mapped[str]             = mapped_column(Text)
     category:      Mapped[RequestCategory] = mapped_column(
         Enum(RequestCategory, name="request_category_enum", native_enum=False)
+    )
+    priority: Mapped[RequestPriority] = mapped_column(
+        Enum(RequestPriority, name="request_priority_enum", native_enum=False),
+        default=RequestPriority.MEDIUM
     )
     scheduled_at:  Mapped[datetime]        = mapped_column(DateTime(timezone=True))  # proper DateTime
     location_text: Mapped[str]             = mapped_column(String(300))

@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 from app.services.database import AsyncSessionLocal
-from app.models.help_request import HelpRequest, RequestCategory, RequestStatus
+from app.models.help_request import HelpRequest, RequestCategory, RequestPriority, RequestStatus
 
 async def create_help_request(
     user_id: str,
@@ -10,8 +10,9 @@ async def create_help_request(
     category: str,
     scheduled_at: str,
     location_text: str,
-    latitude: float = None,
-    longitude: float = None
+    priority: str = "medium",
+    latitude: float | None = None,
+    longitude: float | None = None
 ) -> str:
     # Validate and parse datetime from agent
     try:
@@ -32,6 +33,15 @@ async def create_help_request(
             "ok": False,
             "message": f"Invalid category '{category}'. Must be: medical, grocery, cleaning, transport, other"
         })
+    
+    # Validate priority
+    try:
+        pri = RequestPriority(priority)
+    except ValueError:
+        return json.dumps({
+            "ok": False,
+            "message": f"Invalid priority '{priority}'. Must be: low, medium, urgent"
+        })
 
     async with AsyncSessionLocal() as db:
         req = HelpRequest(
@@ -39,6 +49,7 @@ async def create_help_request(
             title=title,
             description=description,
             category=cat,
+            priority=pri,
             scheduled_at=parsed_dt,
             location_text=location_text,
             latitude=latitude,

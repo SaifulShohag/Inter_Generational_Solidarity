@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
-from app.models.help_request import RequestCategory, RequestStatus
+from app.models.help_request import RequestCategory, RequestPriority, RequestStatus
 
 class HelpRequestOut(BaseModel):
     id:            int
@@ -8,6 +8,7 @@ class HelpRequestOut(BaseModel):
     title:         str
     description:   str
     category:      RequestCategory
+    priority: RequestPriority
     scheduled_at:  datetime          # proper datetime — not a raw string
     location_text: str
     latitude:      float | None
