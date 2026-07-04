@@ -1,25 +1,13 @@
-import { useState } from 'react';
-import { ArrowLeft, Mic, Volume2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Mic, MicOff, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { apiStartConversation, apiSendMessage, streamResponse } from '../../services/api';
 import { cn } from '../../utils/cn';
 
-type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking';
+type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking' | 'unsupported';
 
-const SAMPLE_TRANSCRIPTS = [
-  "J'ai besoin d'aide pour faire mes courses au marché...",
-  "Je voudrais qu'on m'accompagne chez le médecin demain...",
-  "Pourriez-vous m'aider avec mon téléphone s'il vous plaît ?",
-  "J'ai besoin d'aide pour remplir un formulaire administratif...",
-];
-
-const MOCK_RESPONSES = [
-  "Bien sûr ! Je vais trouver un volontaire pour vous accompagner faire vos courses. À quelle heure préférez-vous ?",
-  "Je comprends. Je cherche un volontaire disponible pour vous accompagner chez le médecin. Quel est votre rendez-vous ?",
-  "Pas de problème ! Un de nos volontaires spécialisé en technologie va vous appeler très bientôt.",
-  "Je vais vous trouver quelqu'un pour vous aider avec ce formulaire. Avez-vous les documents prêts ?",
-];
+const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
 function WaveBar({ delay }: { delay: string }) {
   return (
@@ -31,10 +19,18 @@ export function Voice() {
   const navigate = useNavigate();
   const { token, sessionId, setSessionId } = useApp();
 
-  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [voiceState, setVoiceState] = useState<VoiceState>(SR ? 'idle' : 'unsupported');
   const [transcript, setTranscript] = useState('');
   const [aiResponse, setAiResponse] = useState('');
-  const [sampleIdx, setSampleIdx] = useState(0);
+  const [error, setError] = useState('');
+
+  const recognitionRef = useRef<any>(null);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => () => {
+    recognitionRef.current?.abort();
+    window.speechSynthesis?.cancel();
+  }, []);
 
   const getOrCreateSession = async (): Promise<string> => {
     if (sessionId) return sessionId;
@@ -43,58 +39,90 @@ export function Voice() {
     return id;
   };
 
-  const startListening = async () => {
-    setVoiceState('listening');
+  const startListening = () => {
+    if (!SR) return;
+
+    cancelledRef.current = false;
     setTranscript('');
     setAiResponse('');
+    setError('');
+    setVoiceState('listening');
 
-    // Simulate speech capture by animating through a sample transcript
-    const sample = SAMPLE_TRANSCRIPTS[sampleIdx % SAMPLE_TRANSCRIPTS.length];
-    for (let i = 0; i <= sample.length; i += 3) {
-      await new Promise(r => setTimeout(r, 80));
-      setTranscript(sample.slice(0, i));
-    }
-    setTranscript(sample);
-    setSampleIdx(i => i + 1);
+    const recognition = new SR();
+    recognitionRef.current = recognition;
+    recognition.lang = 'fr-FR';
+    recognition.interimResults = true;
+    recognition.continuous = false;
 
-    setVoiceState('processing');
+    let finalTranscript = '';
 
-    try {
-      let reply = '';
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const r = event.results[i];
+        if (r.isFinal) finalTranscript += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      setTranscript(finalTranscript || interim);
+    };
 
-      if (token) {
-        // Real API: send the captured transcript to the agent
+    recognition.onerror = (event: any) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setVoiceState('unsupported');
+        setError("Accès au microphone refusé. Autorisez le microphone dans votre navigateur.");
+      } else if (event.error === 'no-speech') {
+        setVoiceState('idle');
+      } else {
+        setVoiceState('idle');
+        setError(`Erreur microphone : ${event.error}`);
+      }
+    };
+
+    recognition.onend = async () => {
+      if (cancelledRef.current || !finalTranscript.trim()) {
+        if (!cancelledRef.current) setVoiceState('idle');
+        return;
+      }
+
+      setVoiceState('processing');
+
+      try {
         const sid = await getOrCreateSession();
-        const reader = await apiSendMessage(token, sid, sample);
+        const reader = await apiSendMessage(token!, sid, finalTranscript.trim());
 
+        let reply = '';
         setVoiceState('speaking');
+
         for await (const chunk of streamResponse(reader)) {
+          if (cancelledRef.current) break;
           reply += chunk;
           setAiResponse(reply);
         }
-      } else {
-        // Demo: use a mock response
-        await new Promise(r => setTimeout(r, 1200));
-        reply = MOCK_RESPONSES[sampleIdx % MOCK_RESPONSES.length];
-        setVoiceState('speaking');
-        setAiResponse(reply);
-      }
 
-      // Browser TTS to speak the response aloud
-      if (reply && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-        const utt = new SpeechSynthesisUtterance(reply);
-        utt.lang = 'fr-FR';
-        utt.rate = 0.95;
-        window.speechSynthesis.speak(utt);
+        if (reply && window.speechSynthesis && !cancelledRef.current) {
+          window.speechSynthesis.cancel();
+          const utt = new SpeechSynthesisUtterance(reply);
+          utt.lang = 'fr-FR';
+          utt.rate = 0.95;
+          utt.onend = () => { if (!cancelledRef.current) setVoiceState('idle'); };
+          window.speechSynthesis.speak(utt);
+        } else if (!cancelledRef.current) {
+          setVoiceState('idle');
+        }
+      } catch (err) {
+        if (!cancelledRef.current) {
+          setError("Erreur lors de la communication avec l'assistant.");
+          setVoiceState('idle');
+        }
       }
-    } catch {
-      setVoiceState('speaking');
-      setAiResponse("Désolé, une erreur est survenue. Veuillez réessayer.");
-    }
+    };
+
+    recognition.start();
   };
 
   const stop = () => {
+    cancelledRef.current = true;
+    recognitionRef.current?.abort();
     window.speechSynthesis?.cancel();
     setVoiceState('idle');
   };
@@ -108,17 +136,22 @@ export function Voice() {
     listening: {
       bg: 'bg-error-light', icon: 'text-error', ring: 'ring-4 ring-error/30 ring-offset-4',
       label: "J'écoute...",
-      sublabel: 'Parlez maintenant, je vous écoute',
+      sublabel: 'Parlez maintenant, appuyez pour arrêter',
     },
     processing: {
       bg: 'bg-warning-light', icon: 'text-warning', ring: 'ring-4 ring-warning/30 ring-offset-4',
       label: 'Traitement...',
-      sublabel: 'Compréhension de votre demande',
+      sublabel: "Compréhension de votre demande",
     },
     speaking: {
       bg: 'bg-accent-light', icon: 'text-accent', ring: 'ring-4 ring-accent/30 ring-offset-4',
       label: "L'IA parle",
       sublabel: 'Appuyez pour arrêter',
+    },
+    unsupported: {
+      bg: 'bg-gray-100', icon: 'text-gray-300', ring: '',
+      label: 'Non disponible',
+      sublabel: 'La reconnaissance vocale n\'est pas supportée dans ce navigateur',
     },
   };
 
@@ -126,16 +159,13 @@ export function Voice() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-blue-50 flex flex-col">
-      {/* Header */}
       <div className="bg-white px-4 py-3 flex items-center gap-4 shadow-soft">
         <button onClick={() => navigate('/elderly')} className="p-2 rounded-xl hover:bg-gray-100 transition-colors" aria-label="Retour">
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
         <div>
           <p className="font-bold text-gray-900">Assistant vocal</p>
-          <p className="text-xs text-gray-400">
-            {token ? 'Parlez naturellement dans votre langue' : 'Mode démo'}
-          </p>
+          <p className="text-xs text-gray-400">Parlez naturellement en français</p>
         </div>
       </div>
 
@@ -167,16 +197,20 @@ export function Voice() {
           </div>
         )}
 
-        {/* Mic button */}
         <button
-          onClick={voiceState === 'idle' ? startListening : stop}
+          onClick={voiceState === 'idle' ? startListening : voiceState === 'unsupported' ? undefined : stop}
+          disabled={voiceState === 'unsupported' || voiceState === 'processing'}
           aria-label={voiceState === 'idle' ? 'Commencer à parler' : 'Arrêter'}
           className={cn(
             'w-36 h-36 rounded-full flex items-center justify-center transition-all duration-300',
-            config.bg, config.ring, 'hover:scale-105 active:scale-95',
+            config.bg, config.ring,
+            voiceState !== 'unsupported' && voiceState !== 'processing' && 'hover:scale-105 active:scale-95',
+            voiceState === 'unsupported' && 'opacity-50 cursor-not-allowed',
           )}
         >
-          {voiceState === 'idle' || voiceState === 'listening' ? (
+          {voiceState === 'unsupported' ? (
+            <MicOff className={cn('w-16 h-16', config.icon)} />
+          ) : voiceState === 'idle' || voiceState === 'listening' ? (
             <Mic className={cn('w-16 h-16', config.icon)} />
           ) : voiceState === 'speaking' ? (
             <Volume2 className={cn('w-16 h-16', config.icon)} />
@@ -191,6 +225,12 @@ export function Voice() {
           <p className="text-2xl font-bold text-gray-900">{config.label}</p>
           <p className="text-gray-500 mt-1">{config.sublabel}</p>
         </div>
+
+        {error && (
+          <div className="w-full max-w-md bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-red-600 text-sm text-center">
+            {error}
+          </div>
+        )}
 
         {transcript && (
           <div className="w-full max-w-md bg-white rounded-3xl shadow-card p-5 animate-slide-up">
@@ -208,18 +248,23 @@ export function Voice() {
             </p>
             <p className="text-gray-800 text-lg leading-relaxed">{aiResponse}</p>
             <button
-              onClick={() => navigate('/elderly')}
+              onClick={() => { setTranscript(''); setAiResponse(''); setVoiceState('idle'); }}
               className="mt-4 w-full bg-accent text-white py-3 rounded-2xl font-bold text-base hover:bg-accent-dark transition-colors active:scale-95"
             >
-              Retour à l'accueil
+              Poser une autre question
             </button>
           </div>
         )}
 
-        {voiceState === 'idle' && !transcript && (
+        {voiceState === 'idle' && !transcript && !error && (
           <div className="w-full max-w-md space-y-3">
             <p className="text-center text-gray-400 text-sm font-medium">Essayez de dire :</p>
-            {SAMPLE_TRANSCRIPTS.map((t, i) => (
+            {[
+              "J'ai besoin d'aide pour faire mes courses...",
+              "Je voudrais qu'on m'accompagne chez le médecin...",
+              "Pourriez-vous m'aider avec mon téléphone ?",
+              "J'ai besoin d'aide pour un formulaire administratif...",
+            ].map((t, i) => (
               <div key={i} className="bg-white rounded-2xl shadow-card px-4 py-3 text-gray-600 text-sm">
                 "{t}"
               </div>
