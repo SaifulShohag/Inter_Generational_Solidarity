@@ -71,11 +71,11 @@ To optimize fulfillment rates, the application bypasses static geographical boun
 
 ## 📈 Expected Impact & Value Proposition
 
-### 1. Eradicating Social Invisibility
-By providing a frictionless link to the outside world, the platform targets the **9 million seniors** who face daily confinement. It restores their presence within the local ecosystem and converts passive isolation into active community engagement.
+### 1. Empowering Seniors Through Daily Functional Support
+The platform directly addresses the practical disabilities seniors face in their daily lives. By streamlining access to essential tasks—such as grocery shopping and reliable transportation—the app effectively bridges the gap between functional limitations and community support, ensuring seniors can manage their day-to-day routines with ease and peace of mind.
 
-### 2. Restoring Autonomy and Dignity
-The system bypasses complex smartphone interfaces, neutralizing the "practical disability" caused by digital exclusion. Features like customizable virtual voices and adapted keyboards give non-verbal or mute users an autonomous, expressive, and dignified voice in their neighborhood.
+### 2. Reconnecting Seniors with Society
+Beyond offering functional assistance, the platform serves as a powerful bridge to reintegrate isolated seniors into the social fabric. By facilitating meaningful, real-world interactions with local volunteers, the solution systematically combats loneliness, restores a sense of belonging, and ensures that older generations remain active, visible, and valued members of society.
 
 ### 3. Rebuilding the Local Social Fabric
 By reconnecting the **2 million seniors** completely cut off from traditional family structures, the app fosters deep, empathetic human interactions. Every functional mission (e.g., grocery shopping, transportation) doubles as an opportunity for meaningful intergenerational conversation.
