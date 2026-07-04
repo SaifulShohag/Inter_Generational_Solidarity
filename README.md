@@ -51,9 +51,9 @@ On the login screen, select a role and use the **demo login** button — no cred
 The **Inter-GenAIrational Solidarity** platform is a hyper-local community assistance network designed to mitigate social isolation and mobility barriers among older demographics.By leveraging Generative AI, the platform eliminates technical barriers for seniors, seamlessly transforming natural voice or accessible text inputs into actionable local volunteer opportunities.
 
 ### Key Metrics & Social Context
-* **Demographic Shift:** Seniors aged 65 and older constitute **22%** of the population, matching the size of the under-20 demographic.
+* **Demographic Shift:** According to the INSEE, seniors aged 65 and older constitute **22%** of the population, matching the size of the under-20 demographic.
 * **Functional Challenges:** A significant portion of this demographic faces a "practical disability" in executing standard tasks of daily living, such as grocery shopping and accessing reliable transportation.
-* **Severe Isolation:**
+* **Severe Isolation:** According to Les Petits Frères des Pauvres,
   * **2 million** seniors live completely cut off from family and close social circles.
   * **1.5 million** seniors report zero or near-zero contact with direct descendants.
   * **9 million** seniors do not leave their residences on a daily basis, rendering them socially invisible.
