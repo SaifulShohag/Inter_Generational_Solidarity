@@ -10,6 +10,7 @@ services:
       CONVERSATIONS_DIR: /data/conversations
     volumes:
       - app_data:/data
+      - ./backend:/app    # <--- ADD THIS LINE
     restart: unless-stopped
 
   frontend:
