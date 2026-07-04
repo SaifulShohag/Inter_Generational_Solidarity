@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelpMe Conversation</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --bg-soft: #111827;
+            --card: rgba(255, 255, 255, 0.96);
+            --text: #0f172a;
+            --muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary: #eef4ff;
+            --border: #dbe3f0;
+            --success: #15803d;
+            --error: #b91c1c;
+            --bubble-user: #e0ecff;
+            --bubble-agent: #f8fafc;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.25), transparent 28%),
+                radial-gradient(circle at right center, rgba(14, 165, 233, 0.18), transparent 24%),
+                linear-gradient(135deg, var(--bg), var(--bg-soft));
+            padding: 24px;
+        }
+
+        .shell {
+            width: min(100%, 1100px);
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 0.95fr 1.05fr;
+            gap: 24px;
+        }
+
+        .panel {
+            border-radius: 28px;
+            padding: 28px;
+            backdrop-filter: blur(14px);
+            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
+        }
+
+        .hero {
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #fff;
+            background: linear-gradient(160deg, rgba(37, 99, 235, 0.24), rgba(15, 23, 42, 0.15));
+        }
+
+        .card {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: var(--card);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            font-size: 0.85rem;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: #22c55e;
+            box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.14);
+        }
+
+        h1 {
+            margin: 20px 0 12px;
+            font-size: clamp(2.1rem, 4vw, 3.5rem);
+            line-height: 1.05;
+            letter-spacing: -0.04em;
+        }
+
+        p {
+            margin: 0;
+            line-height: 1.7;
+        }
+
+        .hero p {
+            color: rgba(255, 255, 255, 0.82);
+            max-width: 44ch;
+        }
+
+        .meta {
+            display: grid;
+            gap: 10px;
+            margin-top: 22px;
+            font-size: 0.92rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .meta code {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.14);
+            color: #fff;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .toolbar h2 {
+            margin: 0;
+            font-size: 1.45rem;
+        }
+
+        .status {
+            margin-top: 10px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            min-height: 48px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .status.ok {
+            border-color: rgba(21, 128, 61, 0.22);
+            background: rgba(21, 128, 61, 0.06);
+            color: var(--success);
+        }
+
+        .status.error {
+            border-color: rgba(185, 28, 28, 0.22);
+            background: rgba(185, 28, 28, 0.06);
+            color: var(--error);
+        }
+
+        .messages {
+            margin-top: 18px;
+            height: 430px;
+            overflow: auto;
+            padding: 18px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, #fff, #f8fbff);
+            display: grid;
+            gap: 12px;
+        }
+
+        .bubble {
+            max-width: 82%;
+            padding: 14px 16px;
+            border-radius: 18px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .bubble.user {
+            margin-left: auto;
+            background: var(--bubble-user);
+            border: 1px solid #bfd6ff;
+        }
+
+        .bubble.agent {
+            margin-right: auto;
+            background: var(--bubble-agent);
+            border: 1px solid var(--border);
+        }
+
+        .composer {
+            display: grid;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 110px;
+            resize: vertical;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 14px 16px;
+            font: inherit;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        textarea:focus {
+            border-color: rgba(37, 99, 235, 0.65);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .mic-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .mic-btn {
+            width: 52px;
+            height: 52px;
+            padding: 0;
+            border-radius: 16px;
+            font-size: 1.15rem;
+        }
+
+        .mic-btn.listening {
+            background: #dc2626;
+            color: #fff;
+        }
+
+        .transcript {
+            flex: 1;
+            min-height: 52px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: #f8fafc;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            line-height: 1.45;
+        }
+
+        button, a.button {
+            appearance: none;
+            border: 0;
+            border-radius: 14px;
+            padding: 13px 18px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover, a.button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .primary {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.24);
+        }
+
+        .primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .secondary {
+            background: var(--secondary);
+            color: #1e3a8a;
+        }
+
+        .small {
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        @media (max-width: 960px) {
+            .shell {
+                grid-template-columns: 1fr;
+            }
+
+            .panel {
+                padding: 24px;
+                border-radius: 24px;
+            }
+
+            .messages {
+                height: 340px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="panel hero">
+            <div class="eyebrow"><span class="dot"></span> HelpMe Conversation</div>
+            <h1>Start the chat.</h1>
+            <p>
+                This screen creates a requester conversation session, then sends your messages to the backend.
+            </p>
+            <div class="meta">
+                <div>Start session <code>POST /conversations/start</code></div>
+                <div>Send message <code>POST /conversations/{session_id}/message</code></div>
+                <div>Token <code>localStorage: helpme_access_token</code></div>
+            </div>
+        </section>
+
+        <section class="panel card">
+            <div class="toolbar">
+                <div>
+                    <h2>Conversation</h2>
+                    <div class="small" id="session-label">No session yet.</div>
+                </div>
+                <div class="actions">
+                    <a class="button secondary" href="/login.html">Back to login</a>
+                    <button class="primary" id="start-session-btn" type="button">Start session</button>
+                </div>
+            </div>
+
+            <div id="status" class="status">Ready.</div>
+            <div id="messages" class="messages"></div>
+
+            <form id="composer" class="composer">
+                <textarea id="message" placeholder="Type your message here..." disabled></textarea>
+                <div class="mic-row">
+                    <button class="secondary mic-btn" id="mic-btn" type="button" title="Use microphone" disabled>🎤</button>
+                    <div class="transcript" id="transcript">Mic input will appear here.</div>
+                </div>
+                <div class="actions">
+                    <button class="primary" id="send-btn" type="submit" disabled>Send</button>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <script>
+        const API_BASE = window.location.origin;
+        const TOKEN_KEY = "helpme_access_token";
+        const SESSION_KEY = "helpme_session_id";
+
+        const sessionLabel = document.getElementById("session-label");
+        const statusEl = document.getElementById("status");
+        const messagesEl = document.getElementById("messages");
+        const startSessionBtn = document.getElementById("start-session-btn");
+        const composer = document.getElementById("composer");
+        const messageInput = document.getElementById("message");
+        const sendBtn = document.getElementById("send-btn");
+        const micBtn = document.getElementById("mic-btn");
+        const transcriptEl = document.getElementById("transcript");
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+
+        if (recognition) {
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = "en-US";
+        } else {
+            micBtn.disabled = true;
+            micBtn.title = "Speech recognition is not supported in this browser";
+            transcriptEl.textContent = "Mic input is not supported in this browser.";
+        }
+
+        function getToken() {
+            return localStorage.getItem(TOKEN_KEY) || "";
+        }
+
+        function getSessionId() {
+            return localStorage.getItem(SESSION_KEY) || "";
+        }
+
+        function setSessionId(sessionId) {
+            localStorage.setItem(SESSION_KEY, sessionId);
+            sessionLabel.textContent = `Session: ${sessionId}`;
+        }
+
+        function setStatus(message, kind = "") {
+            statusEl.className = `status ${kind}`.trim();
+            statusEl.textContent = message;
+        }
+
+        function addMessage(role, text) {
+            const bubble = document.createElement("div");
+            bubble.className = `bubble ${role}`;
+            bubble.textContent = text;
+            messagesEl.appendChild(bubble);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function setTranscript(text) {
+            transcriptEl.textContent = text || "Mic input will appear here.";
+        }
+
+        function speakText(text) {
+            if (!text || !window.speechSynthesis) {
+                return;
+            }
+
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function ensureAuth() {
+            if (!getToken()) {
+                window.location.href = "/login.html";
+            }
+        }
+
+        async function startSession() {
+            const response = await fetch(`${API_BASE}/conversations/start`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${getToken()}`
+                }
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const detail = data.detail || data.message || "Could not start session.";
+                throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+            }
+
+            setSessionId(data.session_id);
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            micBtn.disabled = !recognition;
+            setStatus(`Conversation started. Session: ${data.session_id}`, "ok");
+            return data.session_id;
+        }
+
+        async function sendMessage(text) {
+            const sessionId = getSessionId();
+            if (!sessionId) {
+                throw new Error("Start a session first.");
+            }
+
+            const response = await fetch(`${API_BASE}/conversations/${sessionId}/message`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok || !response.body) {
+                const data = await response.json().catch(() => ({}));
+                const detail = data.detail || data.message || "Message failed.";
+                throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let agentReply = "";
+            let buffer = "";
+            let agentBubble = null;
+
+            function appendAgentText(text) {
+                agentReply += text;
+                if (!agentBubble) {
+                    agentBubble = document.createElement("div");
+                    agentBubble.className = "bubble agent";
+                    messagesEl.appendChild(agentBubble);
+                }
+                agentBubble.textContent = agentReply;
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                let boundaryIndex = buffer.indexOf("\n\n");
+                while (boundaryIndex !== -1) {
+                    const eventBlock = buffer.slice(0, boundaryIndex);
+                    buffer = buffer.slice(boundaryIndex + 2);
+
+                    const lines = eventBlock.split("\n");
+                    for (const line of lines) {
+                        if (!line.startsWith("data:")) continue;
+                        const content = line.slice(5).trimStart();
+                        if (content.startsWith("[DONE]")) {
+                            continue;
+                        }
+                        if (content.startsWith("[ERROR]")) {
+                            throw new Error(content);
+                        }
+                        appendAgentText(content);
+                    }
+
+                    boundaryIndex = buffer.indexOf("\n\n");
+                }
+            }
+
+            if (buffer.trim()) {
+                const lines = buffer.split("\n");
+                for (const line of lines) {
+                    if (!line.startsWith("data:")) continue;
+                    const content = line.slice(5).trimStart();
+                    if (content.startsWith("[DONE]")) continue;
+                    if (content.startsWith("[ERROR]")) {
+                        throw new Error(content);
+                    }
+                    appendAgentText(content);
+                }
+            }
+
+            if (!agentBubble) {
+                agentBubble = document.createElement("div");
+                agentBubble.className = "bubble agent";
+                agentBubble.textContent = agentReply;
+                messagesEl.appendChild(agentBubble);
+            }
+
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            speakText(agentReply);
+        }
+
+        function startMicCapture() {
+            if (!recognition) {
+                return;
+            }
+
+            window.speechSynthesis?.cancel();
+            micBtn.classList.add("listening");
+            setTranscript("Listening...");
+            recognition.start();
+        }
+
+        if (recognition) {
+            recognition.onresult = (event) => {
+                let finalText = "";
+                let interimText = "";
+
+                for (let index = event.resultIndex; index < event.results.length; index += 1) {
+                    const result = event.results[index];
+                    if (result.isFinal) {
+                        finalText += result[0].transcript;
+                    } else {
+                        interimText += result[0].transcript;
+                    }
+                }
+
+                const transcript = (finalText || interimText).trim();
+                if (transcript) {
+                    messageInput.value = transcript;
+                    setTranscript(transcript);
+                }
+            };
+
+            recognition.onerror = () => {
+                micBtn.classList.remove("listening");
+                setTranscript("Microphone input failed.");
+            };
+
+            recognition.onend = () => {
+                micBtn.classList.remove("listening");
+            };
+        }
+
+        micBtn.addEventListener("click", () => {
+            if (!recognition) {
+                return;
+            }
+
+            startMicCapture();
+        });
+
+        startSessionBtn.addEventListener("click", async () => {
+            startSessionBtn.disabled = true;
+            setStatus("Starting session...", "");
+
+            try {
+                await startSession();
+            } catch (error) {
+                setStatus(error.message, "error");
+            } finally {
+                startSessionBtn.disabled = false;
+            }
+        });
+
+        composer.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const text = messageInput.value.trim();
+            if (!text) return;
+
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            addMessage("user", text);
+            messageInput.value = "";
+            setStatus("Thinking...", "");
+
+            try {
+                if (!getSessionId()) {
+                    await startSession();
+                }
+                await sendMessage(text);
+                setStatus("Message sent.", "ok");
+            } catch (error) {
+                setStatus(error.message, "error");
+            } finally {
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                messageInput.focus();
+            }
+        });
+
+        ensureAuth();
+        if (!getSessionId()) {
+            sessionLabel.textContent = "No session yet. Click Start session.";
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            micBtn.disabled = true;
+            startSession().catch((error) => {
+                setStatus(error.message, "error");
+            });
+        } else {
+            sessionLabel.textContent = `Session: ${getSessionId()}`;
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            micBtn.disabled = !recognition;
+            setStatus("Session restored from browser storage.", "ok");
+        }
+    </script>
+</body>
+</html>
