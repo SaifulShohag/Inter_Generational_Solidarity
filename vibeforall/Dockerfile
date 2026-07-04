@@ -5,7 +5,8 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 ARG VITE_API_URL=""
-RUN VITE_API_URL=$VITE_API_URL npm run build
+ENV VITE_API_URL=$VITE_API_URL
+RUN npx vite build
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
