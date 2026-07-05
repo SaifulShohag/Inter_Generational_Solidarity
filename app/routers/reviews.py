@@ -64,11 +64,18 @@ async def submit_review(
     await db.refresh(review)
     return review
 
-@router.get("/users/{user_id}/reviews", response_model=list[ReviewOut])
+@router.get("/users/{user_id}/reviews")
 async def get_user_reviews(
     user_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user)
+    as_reviewer: bool = False,
+    db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(select(Review).where(Review.reviewee_id == user_id))
+    if as_reviewer:
+        result = await db.execute(
+            select(Review).where(Review.reviewer_id == user_id)
+        )
+    else:
+        result = await db.execute(
+            select(Review).where(Review.reviewee_id == user_id)
+        )
     return result.scalars().all()

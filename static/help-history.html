@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HelpMe – Mon historique</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding-bottom: 80px; }
+    .page { padding: 20px 16px; max-width: 600px; margin: 0 auto; }
+    .page-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+    .back-btn { background: #f3f4f6; border: none; border-radius: 12px; width: 38px; height: 38px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+    .banner-card { background: linear-gradient(135deg, #ec4899, #ef4444); color: #fff; border-radius: 24px; padding: 20px; display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .banner-card .icon { font-size: 2.5rem; flex-shrink: 0; }
+    .hist-item { background: #fff; border-radius: 24px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 14px; transition: box-shadow .2s; }
+    .hist-item:hover { box-shadow: var(--shadow-hover); }
+    .status-bar { height: 4px; }
+    .hist-body { padding: 18px; }
+    .hist-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+    .hist-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 3px; }
+    .hist-desc  { font-size: .85rem; color: var(--muted); }
+    .hist-meta  { display: flex; gap: 14px; flex-wrap: wrap; font-size: .8rem; color: var(--muted); margin-bottom: 12px; }
+    .hist-meta span { display: flex; align-items: center; gap: 5px; }
+    .continue-btn { width: 100%; background: var(--accent-light); color: var(--accent); border: none; border-radius: 16px; padding: 11px; font: 600 .9rem 'Inter',sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background .2s; }
+    .continue-btn:hover { background: #dbeafe; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-state .icon { font-size: 3.5rem; margin-bottom: 16px; }
+    .skeleton-item { background: #fff; border-radius: 24px; padding: 20px; margin-bottom: 14px; }
+  </style>
+</head>
+<body class="animate-fade">
+  <div class="page animate-slide">
+    <div class="page-header">
+      <button class="back-btn" onclick="window.location.href='/elderly-home.html'">←</button>
+      <div>
+        <h1 style="font-size:1.5rem">Mon historique d'aide</h1>
+        <p id="count-label" style="color:var(--muted);font-size:.88rem">Chargement…</p>
+      </div>
+    </div>
+
+    <div class="banner-card">
+      <div class="icon">💖</div>
+      <div>
+        <p style="font-weight:800;font-size:1.05rem">Vos bénévoles sont formidables !</p>
+        <p style="font-size:.85rem;opacity:.9;margin-top:4px">Retrouvez toutes vos demandes d'aide ici</p>
+      </div>
+    </div>
+
+    <div id="list">
+      <div class="skeleton-item"><div class="skeleton" style="height:20px;width:60%;margin-bottom:10px"></div><div class="skeleton" style="height:14px;width:80%"></div></div>
+      <div class="skeleton-item"><div class="skeleton" style="height:20px;width:50%;margin-bottom:10px"></div><div class="skeleton" style="height:14px;width:70%"></div></div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a class="nav-item" href="/elderly-home.html"><span class="nav-icon">🏠</span>Accueil</a>
+    <a class="nav-item" href="/chat.html"><span class="nav-icon">💬</span>Chat</a>
+    <a class="nav-item active" href="/help-history.html"><span class="nav-icon">📋</span>Historique</a>
+    <a class="nav-item" href="#"><span class="nav-icon">👤</span>Profil</a>
+  </nav>
+
+  <script src="/help-history.js"></script>
+</body>
+</html>

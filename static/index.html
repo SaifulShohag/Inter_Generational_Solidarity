@@ -1,178 +1,85 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HelpMe</title>
-    <style>
-        :root {
-            --bg: #0f172a;
-            --bg-soft: #111827;
-            --card: rgba(255, 255, 255, 0.96);
-            --text: #0f172a;
-            --muted: #64748b;
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --secondary: #eef4ff;
-            --border: #dbe3f0;
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: var(--text);
-            background:
-                radial-gradient(circle at top left, rgba(37, 99, 235, 0.25), transparent 28%),
-                radial-gradient(circle at right center, rgba(14, 165, 233, 0.18), transparent 24%),
-                linear-gradient(135deg, var(--bg), var(--bg-soft));
-            display: grid;
-            place-items: center;
-            padding: 24px;
-        }
-
-        .shell {
-            width: min(100%, 860px);
-            display: grid;
-            gap: 24px;
-            grid-template-columns: 1.1fr 0.9fr;
-        }
-
-        .panel {
-            border-radius: 28px;
-            padding: 32px;
-            backdrop-filter: blur(14px);
-            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
-        }
-
-        .hero {
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            color: #fff;
-            background: linear-gradient(160deg, rgba(37, 99, 235, 0.24), rgba(15, 23, 42, 0.15));
-        }
-
-        .card {
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            background: var(--card);
-        }
-
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.12);
-            font-size: 0.85rem;
-        }
-
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 999px;
-            background: #22c55e;
-            box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.14);
-        }
-
-        h1 {
-            margin: 20px 0 12px;
-            font-size: clamp(2.2rem, 5vw, 4rem);
-            line-height: 1.03;
-            letter-spacing: -0.04em;
-        }
-
-        p {
-            margin: 0;
-            line-height: 1.7;
-        }
-
-        .hero p { color: rgba(255, 255, 255, 0.82); max-width: 46ch; }
-        .card p { color: var(--muted); }
-
-        .actions {
-            display: grid;
-            gap: 12px;
-            margin-top: 24px;
-        }
-
-        a.button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 13px 18px;
-            border-radius: 14px;
-            text-decoration: none;
-            font-weight: 700;
-            transition: transform 0.15s ease, background 0.2s ease;
-        }
-
-        a.button:hover { transform: translateY(-1px); }
-        .primary { background: var(--primary); color: #fff; }
-        .primary:hover { background: var(--primary-hover); }
-        .secondary { background: var(--secondary); color: #1e3a8a; }
-
-        .meta {
-            display: grid;
-            gap: 10px;
-            margin-top: 22px;
-            font-size: 0.92rem;
-            color: rgba(255, 255, 255, 0.78);
-        }
-
-        .meta code {
-            display: inline-block;
-            margin-left: 6px;
-            padding: 2px 6px;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.14);
-            color: #fff;
-        }
-
-        .note {
-            margin-top: 18px;
-            padding: 14px 16px;
-            border-radius: 14px;
-            border: 1px solid var(--border);
-            background: rgba(248, 250, 252, 0.8);
-            color: var(--muted);
-            line-height: 1.55;
-        }
-
-        @media (max-width: 860px) {
-            .shell { grid-template-columns: 1fr; }
-            .panel { padding: 24px; border-radius: 24px; }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HelpMe – Bienvenue</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+    .logo { width: 72px; height: 72px; border-radius: 24px; background: linear-gradient(135deg, #4F8EF7, #6366f1); display: flex; align-items: center; justify-content: center; font-size: 2rem; box-shadow: 0 12px 32px rgba(79,142,247,.4); margin-bottom: 20px; }
+    .tagline { color: var(--muted); text-align: center; max-width: 34ch; font-size: 1.05rem; margin-top: 8px; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 640px; margin: 40px 0 32px; }
+    @media (max-width: 520px) { .cards { grid-template-columns: 1fr; } }
+    .role-card {
+      border: 2px solid transparent; border-radius: 28px; padding: 28px; background: #fff;
+      box-shadow: var(--shadow); cursor: pointer; text-align: left; transition: all .25s;
+      position: relative; overflow: hidden;
+    }
+    .role-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+    .role-card.volunteer:hover { border-color: var(--accent); }
+    .role-card.elderly:hover   { border-color: var(--success); }
+    .role-card .blob {
+      position: absolute; top: -24px; right: -24px; width: 96px; height: 96px;
+      border-radius: 50%; transition: transform .4s;
+    }
+    .role-card:hover .blob { transform: scale(1.4); }
+    .volunteer .blob { background: radial-gradient(circle, rgba(79,142,247,.18), rgba(99,102,241,.08)); }
+    .elderly   .blob { background: radial-gradient(circle, rgba(22,163,74,.18), rgba(34,197,94,.08)); }
+    .role-emoji { width: 68px; height: 68px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; margin-bottom: 16px; }
+    .volunteer .role-emoji { background: var(--accent-light); }
+    .elderly   .role-emoji { background: var(--success-light); }
+    .role-title { font-size: 1.35rem; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+    .role-desc  { font-size: .9rem; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+    .role-cta   { display: flex; align-items: center; gap: 6px; font-size: .9rem; font-weight: 700; }
+    .volunteer .role-cta { color: var(--accent); }
+    .elderly   .role-cta { color: var(--success); }
+    .role-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .role-chip  { padding: 4px 10px; background: #f3f4f6; border-radius: 999px; font-size: .76rem; color: #374151; font-weight: 500; }
+    .footer-badges { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; color: var(--muted); font-size: .85rem; }
+    .footer-badges span { display: flex; align-items: center; gap: 6px; }
+    .hdr { text-align: center; }
+  </style>
 </head>
-<body>
-    <main class="shell">
-        <section class="panel hero">
-            <div class="eyebrow"><span class="dot"></span> HelpMe Access</div>
-            <h1>Welcome.</h1>
-            <p>
-                Use the login page if you already have an account, or create a new account on the registration page.
-                After signing in, you can start an authenticated conversation.
-            </p>
-            <div class="meta">
-                <div>Login <code>/login.html</code></div>
-                <div>Register <code>/register.html</code></div>
-                <div>API endpoints <code>/auth/login</code> and <code>/auth/register</code></div>
-            </div>
-        </section>
+<body class="bg-auth animate-fade">
+  <header class="hdr">
+    <div class="logo">💙</div>
+    <h1 style="letter-spacing:-0.03em">HelpMe</h1>
+    <p class="tagline">Aider les seniors grâce à une communication accessible propulsée par l'IA.</p>
+  </header>
 
-        <section class="panel card">
-            <h2 style="margin:0 0 10px;">Get started</h2>
-            <p>Choose where you want to go next.</p>
-            <div class="actions">
-                <a class="button primary" href="/login.html">Login</a>
-                <a class="button secondary" href="/register.html">Create account</a>
-            </div>
-            <div class="note">
-                The app stores your token in browser localStorage after sign in.
-            </div>
-        </section>
-    </main>
+  <div class="cards animate-slide">
+    <button class="role-card volunteer" onclick="go('volunteer')">
+      <div class="blob"></div>
+      <div class="role-emoji">🤝</div>
+      <p class="role-title">Je suis bénévole</p>
+      <p class="role-desc">Aidez les personnes âgées de votre communauté et faites une vraie différence chaque jour.</p>
+      <div class="role-cta">Commencer <span>→</span></div>
+      <div class="role-chips">
+        <span class="role-chip">🌟 1 200+ bénévoles</span>
+        <span class="role-chip">⭐ 4,9 noté</span>
+      </div>
+    </button>
+
+    <button class="role-card elderly" onclick="go('elderly')">
+      <div class="blob"></div>
+      <div class="role-emoji">👴</div>
+      <p class="role-title">Je suis un senior</p>
+      <p class="role-desc">Obtenez de l'aide quand vous en avez besoin, de façon simple et naturelle.</p>
+      <div class="role-cta" style="color:var(--success)">Commencer <span>→</span></div>
+      <div class="role-chips">
+        <span class="role-chip">🎤 Vocal &amp; texte</span>
+        <span class="role-chip">✅ Toujours disponible</span>
+      </div>
+    </button>
+  </div>
+
+  <div class="footer-badges animate-fade">
+    <span>👥 Rejoignez 5 000+ membres</span>
+    <span>✨ Communication par IA</span>
+    <span>💙 Fait avec soin</span>
+  </div>
+
+  <script src="/index.js"></script>
 </body>
 </html>

@@ -1,401 +1,86 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HelpMe Login</title>
-    <style>
-        :root {
-            --bg: #0f172a;
-            --bg-soft: #111827;
-            --card: rgba(255, 255, 255, 0.96);
-            --text: #0f172a;
-            --muted: #64748b;
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --secondary: #eef4ff;
-            --border: #dbe3f0;
-            --success: #15803d;
-            --error: #b91c1c;
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            color: var(--text);
-            background:
-                radial-gradient(circle at top left, rgba(37, 99, 235, 0.25), transparent 28%),
-                radial-gradient(circle at right center, rgba(14, 165, 233, 0.18), transparent 24%),
-                linear-gradient(135deg, var(--bg), var(--bg-soft));
-            display: grid;
-            place-items: center;
-            padding: 24px;
-        }
-
-        .shell {
-            width: min(100%, 920px);
-            display: grid;
-            grid-template-columns: 1.05fr 0.95fr;
-            gap: 24px;
-        }
-
-        .hero,
-        .card {
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            backdrop-filter: blur(14px);
-            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.35);
-        }
-
-        .hero {
-            padding: 40px;
-            border-radius: 28px;
-            color: #fff;
-            background: linear-gradient(160deg, rgba(37, 99, 235, 0.24), rgba(15, 23, 42, 0.15));
-        }
-
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.12);
-            font-size: 0.85rem;
-            letter-spacing: 0.02em;
-        }
-
-        .eyebrow-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 999px;
-            background: #22c55e;
-            box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.14);
-        }
-
-        h1 {
-            margin: 20px 0 12px;
-            font-size: clamp(2.2rem, 5vw, 4rem);
-            line-height: 1.03;
-            letter-spacing: -0.04em;
-        }
-
-        .hero p {
-            margin: 0;
-            max-width: 46ch;
-            color: rgba(255, 255, 255, 0.82);
-            font-size: 1.05rem;
-            line-height: 1.7;
-        }
-
-        .card {
-            border-radius: 28px;
-            background: var(--card);
-            padding: 28px;
-        }
-
-        .card h2 {
-            margin: 0 0 10px;
-            font-size: 1.45rem;
-        }
-
-        .subtle {
-            margin: 0 0 22px;
-            color: var(--muted);
-            line-height: 1.6;
-        }
-
-        label {
-            display: block;
-            margin: 16px 0 8px;
-            font-size: 0.92rem;
-            font-weight: 600;
-        }
-
-        input {
-            width: 100%;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 14px 16px;
-            font: inherit;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            background: #fff;
-        }
-
-        input:focus {
-            border-color: rgba(37, 99, 235, 0.65);
-            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-        }
-
-        .row {
-            display: flex;
-            gap: 12px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-
-        button, a.button {
-            appearance: none;
-            border: 0;
-            border-radius: 14px;
-            padding: 13px 18px;
-            font: inherit;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 0.15s ease, background 0.2s ease, opacity 0.2s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        button:hover, a.button:hover {
-            transform: translateY(-1px);
-        }
-
-        button:disabled {
-            opacity: 0.65;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .primary {
-            background: var(--primary);
-            color: #fff;
-            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.24);
-        }
-
-        .primary:hover {
-            background: var(--primary-hover);
-        }
-
-        .secondary {
-            background: var(--secondary);
-            color: #1e3a8a;
-        }
-
-        .status {
-            margin-top: 18px;
-            padding: 14px 16px;
-            border-radius: 14px;
-            background: #f8fafc;
-            border: 1px solid var(--border);
-            min-height: 52px;
-            line-height: 1.55;
-            word-break: break-word;
-        }
-
-        .status.ok {
-            border-color: rgba(21, 128, 61, 0.22);
-            background: rgba(21, 128, 61, 0.06);
-            color: var(--success);
-        }
-
-        .status.error {
-            border-color: rgba(185, 28, 28, 0.22);
-            background: rgba(185, 28, 28, 0.06);
-            color: var(--error);
-        }
-
-        .token-box {
-            margin-top: 18px;
-            padding: 14px 16px;
-            border-radius: 14px;
-            background: #0f172a;
-            color: #e2e8f0;
-            font-size: 0.9rem;
-            line-height: 1.55;
-            overflow-wrap: anywhere;
-            display: none;
-        }
-
-        .meta {
-            display: grid;
-            gap: 10px;
-            margin-top: 20px;
-            color: #475569;
-            font-size: 0.92rem;
-        }
-
-        .meta code {
-            background: #eaf1ff;
-            color: #1d4ed8;
-            padding: 2px 6px;
-            border-radius: 8px;
-        }
-
-        @media (max-width: 860px) {
-            .shell {
-                grid-template-columns: 1fr;
-            }
-
-            .hero,
-            .card {
-                padding: 24px;
-                border-radius: 24px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HelpMe – Connexion</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { display:flex; align-items:center; justify-content:center; padding:24px; }
+    .container { width:100%; max-width:420px; }
+    .back-btn { display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:var(--muted); font:500 .93rem 'Inter',sans-serif; cursor:pointer; padding:0; margin-bottom:32px; transition:color .2s; }
+    .back-btn:hover { color:var(--text); }
+    .auth-icon { width:64px; height:64px; border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:2rem; margin:0 auto 16px; }
+    .hdr { text-align:center; margin-bottom:28px; }
+    .hdr h1 { font-size:1.8rem; margin-bottom:4px; }
+    .hdr p  { color:var(--muted); font-size:.95rem; }
+    .form-card { background:#fff; border-radius:28px; box-shadow:var(--shadow); padding:28px; }
+    .form-fields { display:flex; flex-direction:column; gap:16px; }
+    .toggle-row { text-align:center; margin-top:20px; font-size:.88rem; color:var(--muted); }
+    .toggle-btn { background:none; border:none; font-family:inherit; font-size:inherit; font-weight:700; cursor:pointer; padding:0; transition:color .15s; }
+    .trusted { display:flex; justify-content:center; gap:24px; margin-top:20px; font-size:.78rem; color:var(--muted); }
+    .trusted span { display:flex; align-items:center; gap:5px; }
+    .pw-wrap { position:relative; }
+    .pw-toggle { position:absolute; right:14px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1rem; color:#9ca3af; padding:4px; }
+  </style>
 </head>
-<body>
-    <main class="shell">
-        <section class="hero">
-            <div class="eyebrow"><span class="eyebrow-dot"></span> HelpMe Access</div>
-            <h1>Sign in to continue.</h1>
-            <p>
-                Log in to your HelpMe account, store your session token in the browser, and start a conversation
-                with authenticated API requests.
-            </p>
+<body class="bg-auth animate-fade">
+  <div class="container animate-slide">
+    <button class="back-btn" onclick="history.back()">← Retour</button>
 
-            <div class="meta">
-                <div>API base: <code>same origin</code></div>
-                <div>Login endpoint: <code>POST /auth/login</code></div>
-                <div>Need an account? <code>/register.html</code></div>
-            </div>
-        </section>
+    <div class="hdr">
+      <div class="auth-icon" id="auth-icon">🤝</div>
+      <h1 id="auth-title">Bon retour !</h1>
+      <p id="auth-sub">Connexion en tant que <strong id="role-label" style="color:var(--accent)">Bénévole</strong></p>
+    </div>
 
-        <section class="card">
-            <h2>Login</h2>
-            <p class="subtle">Use the email and password from your existing users table.</p>
+    <div class="form-card">
+      <form id="auth-form" class="form-fields">
+        <div class="input-wrap" id="name-wrap" style="display:none">
+          <label for="name">Nom complet</label>
+          <div class="input-icon-wrap">
+            <span class="input-icon">👤</span>
+            <input id="name" type="text" class="input-field" placeholder="Votre nom" autocomplete="name">
+          </div>
+        </div>
 
-            <form id="login-form">
-                <label for="email">Email</label>
-                <input id="email" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
+        <div class="input-wrap">
+          <label for="email">Adresse e-mail</label>
+          <div class="input-icon-wrap">
+            <span class="input-icon">✉️</span>
+            <input id="email" type="email" class="input-field" placeholder="vous@email.com" required autocomplete="email">
+          </div>
+        </div>
 
-                <label for="password">Password</label>
-                <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Your password">
+        <div class="input-wrap">
+          <label for="password">Mot de passe</label>
+          <p id="pw-hint" style="display:none;font-size:.78rem;color:var(--muted);margin-bottom:4px">Minimum 8 caractères</p>
+          <div class="pw-wrap">
+            <input id="password" type="password" class="input-field" placeholder="Votre mot de passe" required autocomplete="current-password" style="padding-right:44px">
+            <button type="button" class="pw-toggle" id="pw-toggle" title="Afficher/Masquer">👁</button>
+          </div>
+        </div>
 
-                <div class="row">
-                    <button class="primary" id="login-btn" type="submit">Sign in</button>
-                    <button class="secondary" id="start-btn" type="button" disabled>Start conversation</button>
-                    <a class="button secondary" href="/register.html">Create account</a>
-                </div>
-            </form>
+        <div id="status-msg" style="display:none"></div>
 
-            <div id="status" class="status">Ready.</div>
-            <div id="token-box" class="token-box"></div>
-        </section>
-    </main>
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-lg btn-full">
+          <span id="btn-label">Se connecter</span>
+          <span id="btn-spin" class="spinner" style="display:none"></span>
+        </button>
+      </form>
 
-    <script>
-        const API_BASE = window.location.origin;
-        const TOKEN_KEY = "helpme_access_token";
+      <div class="toggle-row">
+        <span id="toggle-text">Pas encore de compte ?</span>
+        <button class="toggle-btn" id="toggle-btn" style="color:var(--accent)">Créer un compte</button>
+      </div>
+    </div>
 
-        const form = document.getElementById("login-form");
-        const loginBtn = document.getElementById("login-btn");
-        const startBtn = document.getElementById("start-btn");
-        const statusEl = document.getElementById("status");
-        const tokenBox = document.getElementById("token-box");
-        const emailInput = document.getElementById("email");
-        const passwordInput = document.getElementById("password");
+    <div class="trusted">
+      <span>🔒 Sécurisé &amp; Privé</span>
+      <span>💙 100% Gratuit</span>
+    </div>
+  </div>
 
-        function setStatus(message, kind = "") {
-            statusEl.className = `status ${kind}`.trim();
-            statusEl.textContent = message;
-        }
-
-        function showToken(token) {
-            tokenBox.style.display = "block";
-            tokenBox.textContent = `Token saved in localStorage as ${TOKEN_KEY}\n\n${token}`;
-        }
-
-        function getToken() {
-            return localStorage.getItem(TOKEN_KEY) || "";
-        }
-
-        function setToken(token) {
-            localStorage.setItem(TOKEN_KEY, token);
-            startBtn.disabled = false;
-            showToken(token);
-        }
-
-        function goToConversation() {
-            window.location.href = "/conversation.html";
-        }
-
-        async function login(email, password) {
-            const response = await fetch(`${API_BASE}/auth/login`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password })
-            });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                const detail = data.detail || data.message || "Login failed.";
-                throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
-            }
-
-            return data;
-        }
-
-        async function startConversation() {
-            const token = getToken();
-            if (!token) {
-                setStatus("Sign in first.", "error");
-                return;
-            }
-
-            const response = await fetch(`${API_BASE}/conversations/start`, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
-            });
-
-            const data = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                const detail = data.detail || data.message || "Could not start a conversation.";
-                throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
-            }
-
-            setStatus(`Conversation started. Session: ${data.session_id}`, "ok");
-            return data;
-        }
-
-        form.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            setStatus("Signing in...", "");
-            loginBtn.disabled = true;
-
-            try {
-                const data = await login(emailInput.value.trim(), passwordInput.value);
-                setToken(data.token);
-                setStatus(`Signed in as ${data.user.name}.`, "ok");
-                window.setTimeout(goToConversation, 500);
-            } catch (error) {
-                localStorage.removeItem(TOKEN_KEY);
-                startBtn.disabled = true;
-                setStatus(error.message, "error");
-            } finally {
-                loginBtn.disabled = false;
-            }
-        });
-
-        startBtn.addEventListener("click", async () => {
-            startBtn.disabled = true;
-            setStatus("Starting conversation...", "");
-
-            try {
-                await startConversation();
-            } catch (error) {
-                setStatus(error.message, "error");
-            } finally {
-                startBtn.disabled = !getToken();
-            }
-        });
-
-        const existingToken = getToken();
-        if (existingToken) {
-            startBtn.disabled = false;
-            showToken(existingToken);
-            setStatus("Existing token found. You can start a conversation.", "ok");
-        }
-    </script>
+  <script src="/login.js"></script>
 </body>
 </html>

@@ -1,7 +1,8 @@
 import json
 import uuid
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from openai import AsyncOpenAI
 from app.config import settings
 from app.services.conversation_store import load_session, save_session
@@ -14,6 +15,15 @@ llm_client = AsyncOpenAI(
 )
 
 SYSTEM_PROMPT = """
+*** LANGUAGE RULE — HIGHEST PRIORITY ***
+Detect the language of EVERY user message and reply ONLY in that exact language.
+- User writes in English → you reply in English.
+- User writes in French → you reply in French.
+- User writes in Arabic → you reply in Arabic.
+- User writes in any other language → you reply in that language.
+Never switch languages unless the user switches first. This rule overrides everything else.
+*** END LANGUAGE RULE ***
+
 You are a warm, patient, and simple-spoken assistant helping elderly or disabled people
 arrange volunteer support. Your job is to have a friendly conversation to understand
 what kind of help they need, then create a help request for them.
@@ -21,18 +31,21 @@ what kind of help they need, then create a help request for them.
 You must collect ALL of the following before saving the request:
 1. What kind of help (category: medical, grocery, cleaning, transport, or other)
 2. A clear description of the task
-3. When they need it (specific date and time — convert to ISO format internally)
-4. Where (their address or a clear location description)
-5. Any special instructions (optional — ask gently)
+3. When they need it (specific date and time - convert to ISO format internally)
+4. Where (their address or a clear location description - service covers the Paris region)
+5. Any special instructions (optional - ask gently)
 
 Rules:
-- ALWAYS reply in the exact same language the user is speaking (e.g., if the user speaks French, you MUST reply in French).
 - Ask only 1-2 questions per message. Never overwhelm.
 - Use simple, friendly language. No jargon.
 - Confirm ALL collected details with the user before calling create_help_request.
 - If the user mentions urgency or time sensitivity, set priority accordingly (low/medium/urgent). Otherwise default to medium.
 - Do NOT call create_help_request until every required field is confirmed.
 - After a successful tool call, tell the user their request is submitted and volunteers will be notified.
+- CRITICAL TIME RULES:
+  * NEVER suggest the user change or question their requested date or time. Accept it exactly as stated.
+  * Do NOT say things like "isn't that late?" or "would you prefer earlier?". The user knows their own schedule.
+  * If the user says "tomorrow at 5pm", schedule it at exactly 17:00 Paris time. No adjustment whatsoever.
 """
 
 TOOLS = [
@@ -57,11 +70,11 @@ TOOLS = [
                     "priority": {
                         "type": "string",
                         "enum": ["low", "medium", "urgent"],
-                        "description": "How urgent is this request? low = flexible timing, medium = within a day or two, urgent = as soon as possible"
+                        "description": "How urgent: low=flexible, medium=within a day or two, urgent=as soon as possible"
                     },
                     "scheduled_at":  {
                         "type": "string",
-                        "description": "ISO datetime e.g. 2026-07-10T14:00:00"
+                        "description": "ISO datetime in Paris timezone e.g. 2026-07-10T17:00:00+02:00"
                     },
                     "location_text": {"type": "string"},
                 },
@@ -87,15 +100,18 @@ TOOLS = [
 
 
 def _build_system_prompt() -> str:
-    now = datetime.now().astimezone().replace(microsecond=0)
+    paris    = ZoneInfo("Europe/Paris")
+    now      = datetime.now(paris).replace(microsecond=0)
+    tomorrow = (now + timedelta(days=1)).date()
     return (
         SYSTEM_PROMPT
         + "\n\n"
-        + "Current date and time context:\n"
-        + f"- Today is {now.date().isoformat()}.\n"
-        + f"- Current local time is {now.isoformat()}.\n"
-        + "- Interpret relative phrases like today, tomorrow, tonight, and next Monday using this date.\n"
-        + "- If the user says a time only, assume it refers to today unless they say otherwise.\n"
+        + "=== DATE/TIME CONTEXT (Europe/Paris timezone) ===\n"
+        + f"- Current Paris date : {now.strftime('%A %d %B %Y')} ({now.date().isoformat()})\n"
+        + f"- Current Paris time : {now.strftime('%H:%M')} (UTC{now.strftime('%z')})\n"
+        + f"- 'Tomorrow' means   : {tomorrow.strftime('%A %d %B %Y')} ({tomorrow.isoformat()})\n"
+        + "- Convert ALL user-given times to ISO 8601 using Europe/Paris offset.\n"
+        + "- NEVER adjust or question the user's requested time. Use it exactly as given.\n"
     )
 
 
@@ -109,7 +125,7 @@ def _normalize_tool_messages(messages: list[dict]) -> list[dict]:
         if role == "assistant" and msg.get("tool_calls"):
             tool_calls = []
             for i, tc in enumerate(msg.get("tool_calls", [])):
-                fn = tc.get("function") or {}
+                fn   = tc.get("function") or {}
                 name = fn.get("name")
                 args = fn.get("arguments")
                 if not name or args is None:
@@ -136,9 +152,9 @@ def _normalize_tool_messages(messages: list[dict]) -> list[dict]:
             if not tc_id:
                 continue
             normalized.append({
-                "role": "tool",
+                "role":         "tool",
                 "tool_call_id": tc_id,
-                "content": msg.get("content", ""),
+                "content":      msg.get("content", ""),
             })
             continue
 
@@ -172,18 +188,18 @@ async def stream_agent_response(
     system_prompt = _build_system_prompt()
 
     try:
-        stream = await llm_client.chat.completions.create(
+        stream = await llm_client.chat.completions.create(  # type: ignore[call-overload]
             model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
-                *session["messages"], # type: ignore
+                *session["messages"], # pyright: ignore[reportArgumentType]
             ],
-            tools=TOOLS, # type: ignore
+            tools=TOOLS, # pyright: ignore[reportArgumentType]
             tool_choice="auto",
             stream=True,
-        ) # type: ignore
+        )
 
-        full_reply = ""
+        full_reply       = ""
         tool_calls_buffer = []
 
         async for chunk in stream:
@@ -206,7 +222,7 @@ async def stream_agent_response(
 
         if tool_calls_buffer:
             session["messages"].append({
-                "role": "assistant",
+                "role":    "assistant",
                 "content": full_reply or None,
                 "tool_calls": [
                     {
@@ -219,13 +235,13 @@ async def stream_agent_response(
             })
 
             for tc in tool_calls_buffer:
-                args = json.loads(tc["arguments"])
+                args        = json.loads(tc["arguments"])
                 result_text = await _call_tool(tc["name"], args, user_id)
                 result_data = json.loads(result_text)
 
                 if tc["name"] == "create_help_request" and result_data.get("ok"):
                     session["request_id"] = result_data.get("request_id")
-                    session["status"] = "completed"
+                    session["status"]     = "completed"
 
                 session["messages"].append({
                     "role":         "tool",
@@ -234,19 +250,19 @@ async def stream_agent_response(
                     "content":      result_text,
                 })
 
-            final_stream = await llm_client.chat.completions.create(
+            final_stream = await llm_client.chat.completions.create(  # type: ignore[call-overload]
                 model=settings.LLM_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     *session["messages"], # type: ignore
                 ],
                 stream=True,
-            ) # type: ignore
+            )
 
             final_reply = ""
             async for chunk in final_stream:
                 if chunk.choices[0].delta.content:
-                    token = chunk.choices[0].delta.content
+                    token        = chunk.choices[0].delta.content
                     final_reply += token
                     yield f"data: {token}\n\n"
 

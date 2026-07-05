@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HelpMe – Mission</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { background: var(--bg); }
+    .page { max-width: 640px; margin: 0 auto; padding: 0 0 100px; }
+    .banner { position: relative; }
+    .banner img { width: 100%; height: 220px; object-fit: cover; display: block; }
+    .banner-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.5), transparent); }
+    .back-btn { position: absolute; top: 16px; left: 16px; width: 40px; height: 40px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border: none; border-radius: 12px; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); }
+    .urgency-badge { position: absolute; bottom: 16px; left: 16px; }
+    .content { padding: 20px 16px; display: flex; flex-direction: column; gap: 20px; }
+    .requester-card { background: #fff8f0; border-radius: 20px; padding: 16px; display: flex; align-items: center; gap: 14px; }
+    .req-info { flex: 1; }
+    .req-label { font-size: .75rem; color: var(--muted); font-weight: 500; margin-bottom: 2px; }
+    .req-name  { font-weight: 700; font-size: 1.05rem; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .detail-box { background: #fff; border-radius: 16px; padding: 14px; box-shadow: var(--shadow-soft); }
+    .detail-box .label { font-size: .73rem; color: var(--muted); font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 5px; }
+    .detail-box .value { font-weight: 600; color: var(--text); font-size: .93rem; }
+    .skills-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+    .skill-chip { display: flex; align-items: center; gap: 5px; padding: 6px 12px; background: var(--accent-light); color: var(--accent); border-radius: 999px; font-size: .82rem; font-weight: 600; }
+    .warning-box { background: var(--warning-light); border-radius: 16px; padding: 14px; display: flex; gap: 10px; align-items: flex-start; font-size: .85rem; color: #78350f; }
+    .sticky-footer { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.95); backdrop-filter: blur(12px); padding: 14px 20px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--border); display: flex; gap: 10px; }
+    .eta-input { flex: 1; }
+    #eta { width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 14px; font: 400 .95rem 'Inter',sans-serif; outline: none; }
+    #eta:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,.12); }
+    .success-state { background: var(--success-light); border-radius: 24px; padding: 24px; text-align: center; margin: 0 16px; }
+    .success-state .emoji { font-size: 2.8rem; margin-bottom: 10px; }
+    .success-state h3 { color: var(--success); font-size: 1.2rem; margin-bottom: 6px; }
+    .success-state p  { font-size: .88rem; color: var(--muted); }
+    #loading { padding: 40px; text-align: center; color: var(--muted); }
+  </style>
+</head>
+<body class="animate-fade">
+  <div class="page" id="page">
+    <div id="loading">Chargement de la mission…</div>
+  </div>
+
+  <script src="/mission-detail.js"></script>
+</body>
+</html>
