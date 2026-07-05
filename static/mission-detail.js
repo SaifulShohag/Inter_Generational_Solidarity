@@ -94,7 +94,7 @@ async function load() {
       ${assignment ? `
         ${meetingCodeHtml(assignment.meeting_code)}
         <div class="alert alert-info" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-          <span>✅ Mission acceptée${assignment.eta_minutes ? ` · ETA : ${assignment.eta_minutes} min` : ''}</span>
+          <span>✅ Mission acceptée${assignment.eta_minutes ? ` · Arrivée dans ${assignment.eta_minutes} min` : ''}</span>
           ${r.status === 'accepted' || r.status === 'in_progress' ? `<button class="btn btn-success btn-sm" id="complete-btn">Marquer terminée</button>` : ''}
           ${r.status === 'completed' ? `<span class="badge badge-green">✅ Terminée</span>` : ''}
         </div>
@@ -110,7 +110,8 @@ async function load() {
 
     <div class="sticky-footer" id="accept-footer" style="${assignment ? 'display:none' : ''}">
       <div class="eta-input">
-        <input id="eta" type="number" min="0" max="240" placeholder="ETA en minutes (ex: 15)" />
+        <label for="eta" style="font-size:.85rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">À quelle heure pensez-vous arriver ?</label>
+        <input id="eta" type="time" />
       </div>
       <button class="btn btn-ghost btn-lg" onclick="history.back()">Décliner</button>
       <button class="btn btn-success btn-lg" id="accept-btn">✅ Accepter</button>
@@ -139,7 +140,16 @@ async function load() {
 }
 
 async function acceptMission() {
-  const etaVal = parseInt(document.getElementById('eta').value || '0', 10);
+  const etaInput = document.getElementById('eta').value;
+  let etaVal = 0;
+  if (etaInput) {
+    const [h, m] = etaInput.split(':').map(Number);
+    const now = new Date();
+    const arrival = new Date();
+    arrival.setHours(h, m, 0, 0);
+    if (arrival <= now) arrival.setDate(arrival.getDate() + 1);
+    etaVal = Math.round((arrival - now) / 60000);
+  }
   const btn = document.getElementById('accept-btn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';

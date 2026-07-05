@@ -422,15 +422,22 @@ if (recognition) {
 
 // ── Init: restore or start new ──
 (async function init() {
-  // Check URL param for voice mode
   const params = new URLSearchParams(window.location.search);
+
   if (params.get('mode') === 'voice') {
     setTimeout(() => { if (recognition) micBtn.click(); }, 800);
   }
 
+  // If a specific session was requested (from "Voir la conversation"), load it directly
+  const sessionParam = params.get('session');
+  if (sessionParam) {
+    await loadSessions();
+    await loadSession(sessionParam);
+    return;
+  }
+
   const stored = localStorage.getItem(SESSION_KEY);
   if (stored) {
-    // Verify session still exists
     try {
       const res = await fetch(`${API}/conversations/${stored}/history`, {
         headers: { Authorization: `Bearer ${token}` }
