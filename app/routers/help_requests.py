@@ -3,7 +3,7 @@ import string
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-from app.dependencies import get_db, get_current_user
+from app.dependencies import get_db, get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.help_request import HelpRequest, RequestStatus
 from app.models.assignment import VolunteerAssignment
@@ -24,7 +24,7 @@ async def list_requests(
     limit:  int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(UserRole.VOLUNTEER)),   # ← volunteers only
 ):
     try:
         status_enum = RequestStatus(status)
@@ -43,7 +43,7 @@ async def list_requests(
 @router.get("/mine", response_model=list[HelpRequestOut])
 async def my_requests(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(UserRole.REQUESTER)),   # ← requesters only
 ):
     result = await db.execute(
         select(HelpRequest)
@@ -57,7 +57,7 @@ async def my_requests(
 async def get_request(
     request_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     req = await db.get(HelpRequest, request_id)
     if not req:
@@ -67,7 +67,7 @@ async def get_request(
     )).scalar_one_or_none()
     return {
         "request":    HelpRequestOut.model_validate(req).model_dump(),
-        "assignment": AssignmentOut.model_validate(assignment).model_dump() if assignment else None
+        "assignment": AssignmentOut.model_validate(assignment).model_dump() if assignment else None,
     }
 
 
@@ -76,10 +76,8 @@ async def accept_request(
     request_id: int,
     body: AssignmentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(UserRole.VOLUNTEER)),
 ):
-    if current_user.role != UserRole.VOLUNTEER:
-        raise HTTPException(403, "Only volunteers can accept requests")
     req = await db.get(HelpRequest, request_id)
     if not req or req.status != RequestStatus.PENDING:
         raise HTTPException(400, "Request is not available")
@@ -101,11 +99,8 @@ async def withdraw_request(
     request_id: int,
     body: WithdrawBody,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(UserRole.VOLUNTEER)),
 ):
-    """Volunteer withdraws from an accepted mission — it goes back to pending for others."""
-    if current_user.role != UserRole.VOLUNTEER:
-        raise HTTPException(403, "Only volunteers can withdraw from a request")
     req = await db.get(HelpRequest, request_id)
     if not req:
         raise HTTPException(404, "Request not found")
@@ -117,9 +112,7 @@ async def withdraw_request(
     if req.status not in (RequestStatus.ACCEPTED, RequestStatus.IN_PROGRESS):
         raise HTTPException(400, f"Cannot withdraw from a {req.status.value} request")
 
-    await db.execute(
-        delete(VolunteerAssignment).where(VolunteerAssignment.request_id == request_id)
-    )
+    await db.execute(delete(VolunteerAssignment).where(VolunteerAssignment.request_id == request_id))
     req.status = RequestStatus.PENDING
     req.cancellation_reason = f"Bénévole retiré : {body.reason}"
     await db.commit()
@@ -131,7 +124,7 @@ async def withdraw_request(
 async def complete_request(
     request_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     req = await db.get(HelpRequest, request_id)
     if not req:
@@ -157,9 +150,8 @@ async def complete_request(
 async def cancel_request(
     request_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(UserRole.REQUESTER)),
 ):
-    """Senior cancels their own request. If already assigned, the assignment is removed."""
     req = await db.get(HelpRequest, request_id)
     if not req:
         raise HTTPException(404, "Request not found")
@@ -168,10 +160,7 @@ async def cancel_request(
     if req.status in (RequestStatus.COMPLETED, RequestStatus.CANCELLED):
         raise HTTPException(400, f"Cannot cancel a {req.status.value} request")
 
-    # Remove any existing assignment so the volunteer history is clean
-    await db.execute(
-        delete(VolunteerAssignment).where(VolunteerAssignment.request_id == request_id)
-    )
+    await db.execute(delete(VolunteerAssignment).where(VolunteerAssignment.request_id == request_id))
     req.status = RequestStatus.CANCELLED
     await db.commit()
     await db.refresh(req)

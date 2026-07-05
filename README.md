@@ -8,36 +8,55 @@
 
 ```
 Inter_Generational_Solidarity/
-├── app/                    # FastAPI backend
-│   ├── main.py             # App entry point, middleware, router registration
-│   ├── config.py           # Environment variable settings
-│   ├── dependencies.py     # Auth & DB dependency injection
-│   ├── models/             # SQLAlchemy database models
-│   ├── routers/            # API route handlers (auth, help requests, conversations…)
-│   ├── schemas/            # Pydantic request/response schemas
-│   └── services/           # Business logic (AI agent, auth, database, sessions)
-├── mcp_server/             # MCP server — tools exposed to the AI agent
-│   └── tools/request_tools.py
-├── alembic/                # Database migration scripts
-├── static/                 # Simple HTML frontend (login, register, chat)
-├── vibeforall/             # React + TypeScript frontend (polished UI)
+├── app/
+│   ├── main.py                  # App entry point, middleware, router registration
+│   ├── config.py                # Environment variable settings (pydantic-settings)
+│   ├── dependencies.py          # Auth & DB dependency injection, require_role()
+│   ├── limiter.py               # Shared slowapi rate-limiter instance
+│   ├── models/                  # SQLAlchemy models (User, HelpRequest, Assignment, Review, Conversation)
+│   ├── routers/                 # Route handlers
+│   │   ├── auth.py              # Register, login (httpOnly cookie), logout, me, delete account
+│   │   ├── conversations.py     # AI chat sessions (SSE streaming)
+│   │   ├── help_requests.py     # CRUD + accept / withdraw / complete / cancel
+│   │   ├── reviews.py           # Post-mission ratings
+│   │   └── location.py          # Nearby requests
+│   ├── schemas/                 # Pydantic request/response models
+│   └── services/
+│       ├── agent_service.py     # AI agent (streaming, tool calling, validation)
+│       ├── auth_service.py      # JWT creation & verification
+│       ├── conversation_store.py# Session persistence (encrypted JSON files)
+│       ├── crypto.py            # Fernet AES encryption for conversation files
+│       └── database.py          # Async SQLAlchemy engine & session
+├── mcp_server/
+│   └── tools/request_tools.py  # Tools exposed to the AI agent
+├── alembic/                     # Database migration scripts
+├── static/                      # HTML/CSS/JS frontend (served by FastAPI)
+│   ├── api.js                   # Shared fetch wrapper (credentials + doLogout)
+│   ├── chat.html / chat.js      # Senior AI chat interface
+│   ├── volunteer-dashboard.*    # Volunteer dashboard
+│   ├── missions.*               # Mission browsing + filtering
+│   ├── mission-detail.*         # Mission detail + accept/withdraw
+│   ├── accepted-missions.*      # Volunteer mission history
+│   ├── help-history.*           # Senior request history + reviews
+│   ├── elderly-home.*           # Senior home screen
+│   └── styles.css
+├── vibeforall/                  # React + TypeScript frontend (polished UI)
+├── conversations/               # Encrypted conversation session files (auto-created)
 ├── requirements.txt
-└── .env                    # ← you create this (see below)
+├── Dockerfile
+├── docker-compose.yml
+└── .env                         # ← you create this (see below)
 ```
 
 ---
 
 ## Running with Docker (Recommended)
 
-Docker is the easiest way to run the backend — no Python, no virtual environment, works the same on Windows, Mac, and Linux.
-
 ### Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
 ### 1. Create the `.env` file
-
-Copy the example and fill in your values:
 
 ```bash
 cp .env.example .env
@@ -46,11 +65,26 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-SECRET_KEY=your-secret-key-here        # any long random string
-DATABASE_URL=sqlite+aiosqlite:///./helpme.db  # leave as-is
-OPENAI_API_KEY=your-api-key-here       # Groq / ZhipuAI / any OpenAI-compatible key
+# Auth — generate with: openssl rand -hex 32
+SECRET_KEY=your-secret-key-here
+
+# Database
+DATABASE_URL=sqlite+aiosqlite:///./helpme.db
+
+# LLM — Groq (free tier available at console.groq.com)
+OPENAI_API_KEY=your-groq-api-key
 OPENAI_BASE_URL=https://api.groq.com/openai/v1
 LLM_MODEL_NAME=llama-3.1-8b-instant
+
+# Conversation encryption (GDPR) — generate with:
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+CONVERSATION_SECRET_KEY=your-fernet-key-here
+
+# CORS — comma-separated list of allowed origins
+ALLOWED_ORIGINS=http://localhost:8000
+
+# Set to true only if your app itself terminates TLS (not needed on Render/Heroku)
+HTTPS_ENABLED=false
 ```
 
 ### 2. Build and start
@@ -59,8 +93,7 @@ LLM_MODEL_NAME=llama-3.1-8b-instant
 docker compose up --build
 ```
 
-The first run builds the image and runs database migrations automatically.
-Subsequent runs just need:
+The first run builds the image and runs database migrations automatically. Subsequent runs:
 
 ```bash
 docker compose up
@@ -68,8 +101,10 @@ docker compose up
 
 ### 3. Open the app
 
-- **Simple HTML frontend:** http://localhost:8000
-- **API docs (Swagger):** http://localhost:8000/docs
+| URL | Description |
+|-----|-------------|
+| http://localhost:8000 | HTML frontend |
+| http://localhost:8000/docs | Interactive API docs (Swagger) |
 
 ### Stop
 
@@ -77,7 +112,7 @@ docker compose up
 docker compose down
 ```
 
-Data (database + conversation sessions) is stored in a Docker volume and survives restarts.
+Data (SQLite database + encrypted conversation files) is stored in a Docker volume and survives restarts.
 
 ---
 
@@ -86,26 +121,11 @@ Data (database + conversation sessions) is stored in a Docker volume and survive
 ### Prerequisites
 
 - Python 3.11+
-- A [ZhipuAI](https://open.bigmodel.cn/) API key (for the GLM-4-Flash AI model)
+- A [Groq](https://console.groq.com/) API key (free tier, Llama 3.1)
 
 ### 1. Create the `.env` file
 
-In the repo root, create a file named `.env` with the following content:
-
-```env
-# Generate any long random string, e.g.: openssl rand -hex 32
-SECRET_KEY=your-secret-key-here
-
-# SQLite database (created automatically on first run)
-DATABASE_URL=sqlite+aiosqlite:///./helpme.db
-
-# ZhipuAI key — get one at https://open.bigmodel.cn/
-GLM_API_KEY=your-zhipuai-api-key
-
-# Optional — these are the defaults, only set them if you want to override
-# GLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
-# GLM_MODEL=glm-4-flash
-```
+See the Docker section above for the full list of variables.
 
 ### 2. Create and activate a virtual environment
 
@@ -131,22 +151,20 @@ pip install -r requirements.txt
 alembic upgrade head
 ```
 
-This creates the SQLite database file (`helpme.db`) with all the required tables:
-- `users` — seniors and volunteers
-- `help_requests` — requests submitted by seniors
-- `volunteer_assignments` — matches between volunteers and requests
-- `reviews` — post-mission ratings
+This creates `helpme.db` with the tables:
 
-### 5. Start the backend server
+| Table | Purpose |
+|-------|---------|
+| `users` | Seniors (role: `requester`) and volunteers |
+| `help_requests` | Requests submitted by seniors via AI chat |
+| `volunteer_assignments` | Volunteer–request matches with meeting code |
+| `reviews` | Post-mission star ratings |
+
+### 5. Start the server
 
 ```bash
 uvicorn app.main:app --reload
 ```
-
-The server runs at **http://localhost:8000**
-
-- **API docs (Swagger):** http://localhost:8000/docs
-- **Simple HTML frontend:** http://localhost:8000
 
 ---
 
@@ -156,78 +174,92 @@ The React frontend runs independently with mock data — no backend required.
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v18 or higher
+- Node.js v18+
 
-### 1. Install dependencies
+### 1. Install and run
 
 ```bash
 cd vibeforall
 npm install
-```
-
-### 2. Start the development server
-
-```bash
 npm run dev
 ```
 
-The app runs at **http://localhost:5173**
-
-### Demo login
-
-On the login screen, select a role then click the **demo login** button — no credentials needed.
-
-| Role | Access |
-|------|--------|
-| **Bénévole (Volunteer)** | Dashboard, missions list, history, statistics, profile |
-| **Senior** | Home screen with AI voice assistant and AI chat |
-
-### Other frontend commands
-
-```bash
-# Type-check without building
-npx tsc --noEmit
-
-# Build for production
-npm run build
-
-# Preview the production build locally
-npm run preview
-```
+Runs at **http://localhost:5173**. Use the demo login button — no credentials needed.
 
 ---
 
 ## How It Works
 
 1. **Senior opens the app** and starts a conversation (voice or text)
-2. **AI agent (GLM-4-Flash)** guides them through a friendly chat to collect:
-   - What kind of help they need (medical, grocery, transport, cleaning, other)
+2. **AI agent (Llama 3.1 via Groq)** guides them through a friendly multilingual chat to collect:
+   - What kind of help (medical, grocery, transport, cleaning, other)
    - Description of the task
-   - Date and time
-   - Location
-3. **AI agent** calls `create_help_request` directly once all details are confirmed
-4. **Help request** is saved to the database with status `PENDING`
-5. **Volunteers** browse open requests and accept missions
-6. After completion, both parties can leave a review
+   - Exact date and time
+   - Location (Paris region)
+   - Priority level
+3. **Server-side validation** blocks the agent from submitting until all 6 fields are confirmed
+4. **Agent calls `create_help_request`** — request saved with status `PENDING`
+5. **Volunteers** browse, filter, and accept open missions
+6. A **meeting code** is generated on acceptance — the senior shows it to confirm identity
+7. After completion, both parties rate each other
 
 ---
 
-## API Overview
+## Security
+
+| Measure | Implementation |
+|---------|---------------|
+| Auth tokens | httpOnly cookies (JS-inaccessible) + Bearer header fallback |
+| Conversation files | AES-128 encrypted at rest (Fernet) |
+| Role enforcement | Server-side `require_role()` on every endpoint |
+| Brute force protection | 10 req/min rate limit on `/auth/login` and `/auth/register` |
+| CORS | Restricted to `ALLOWED_ORIGINS` (no wildcard in production) |
+| Password storage | bcrypt |
+
+---
+
+## API Reference
+
+### Auth
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/auth/register` | — | Create account; sets httpOnly cookie |
+| `POST` | `/auth/login` | — | Login; sets httpOnly cookie |
+| `POST` | `/auth/logout` | cookie | Clear auth cookie |
+| `GET` | `/auth/me` | cookie | Get current user |
+| `DELETE` | `/auth/me` | cookie | Delete account and all data |
+
+### Conversations (seniors only)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/auth/register` | Create a new account |
-| `POST` | `/auth/login` | Login and receive a JWT token |
-| `GET` | `/auth/me` | Get the current user |
-| `POST` | `/conversations/` | Start a new AI conversation session |
-| `POST` | `/conversations/{id}/message` | Send a message (streams SSE response) |
-| `GET` | `/help-requests/` | List help requests |
-| `GET` | `/help-requests/{id}` | Get a specific request |
-| `POST` | `/help-requests/{id}/accept` | Volunteer accepts a mission |
-| `POST` | `/reviews/` | Submit a review |
-| `GET` | `/location/nearby` | Get nearby open requests |
+| `GET` | `/conversations` | List user's sessions |
+| `POST` | `/conversations/start` | Start a new session |
+| `POST` | `/conversations/{id}/message` | Send message (SSE streaming) |
+| `GET` | `/conversations/{id}/history` | Get session history |
 
-Full interactive docs available at **http://localhost:8000/docs** when the server is running.
+### Help Requests
+
+| Method | Endpoint | Role | Description |
+|--------|----------|------|-------------|
+| `GET` | `/requests` | volunteer | Browse pending missions |
+| `GET` | `/requests/mine` | requester | My own requests |
+| `GET` | `/requests/{id}` | any | Request detail + assignment |
+| `POST` | `/requests/{id}/accept` | volunteer | Accept a mission |
+| `POST` | `/requests/{id}/withdraw` | volunteer | Withdraw from a mission |
+| `POST` | `/requests/{id}/complete` | either | Mark as completed |
+| `POST` | `/requests/{id}/cancel` | requester | Cancel a pending request |
+
+### Reviews & Location
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/requests/{id}/review` | Submit a star rating |
+| `GET` | `/users/{id}/reviews` | Get reviews for a user |
+| `GET` | `/location/nearby` | Nearby open requests |
+
+Full interactive docs at **http://localhost:8000/docs**
 
 ---
 
@@ -236,12 +268,24 @@ Full interactive docs available at **http://localhost:8000/docs** when the serve
 | Layer | Technology |
 |-------|-----------|
 | Backend API | FastAPI + Uvicorn |
-| Database | SQLite (async via aiosqlite + SQLAlchemy) |
+| Database | SQLite (async — aiosqlite + SQLAlchemy 2.0) |
 | Migrations | Alembic |
-| Auth | JWT (python-jose + passlib/bcrypt) |
-| AI Model | GLM-4-Flash / Llama 3 (any OpenAI-compatible API) |
-| Agent tooling | Tool calling via OpenAI-compatible streaming API |
-| Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS v3 |
-| Charts | Recharts |
-| Icons | Lucide React |
+| Auth | JWT via python-jose; passwords via passlib/bcrypt; httpOnly cookies |
+| Rate limiting | slowapi |
+| Encryption | cryptography (Fernet) — conversation files at rest |
+| AI Model | Llama 3.1-8b-instant via Groq (OpenAI-compatible API) |
+| AI tooling | Streaming tool calling with server-side field validation |
+| HTML frontend | Vanilla JS + CSS (served by FastAPI from `/static`) |
+| React frontend | React 18 + TypeScript + Vite + Tailwind CSS v3 |
+
+---
+
+## Deployment (Render)
+
+1. Push to GitHub
+2. New Web Service → connect repo → **Docker** environment
+3. Add all `.env` variables in the Render dashboard
+4. Set `ALLOWED_ORIGINS=https://your-app.onrender.com`
+5. Leave `HTTPS_ENABLED=false` — Render terminates TLS at the edge, not inside your container
+
+> **Note:** Render's filesystem is ephemeral. For persistent data, add a **Render PostgreSQL** database and update `DATABASE_URL` — no code changes required.
