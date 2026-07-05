@@ -22,6 +22,24 @@
     .trusted span { display:flex; align-items:center; gap:5px; }
     .pw-wrap { position:relative; }
     .pw-toggle { position:absolute; right:14px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1rem; color:#9ca3af; padding:4px; }
+    .consent-wrap { display:flex; align-items:flex-start; gap:10px; background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
+    .consent-wrap input[type=checkbox] { margin-top:2px; width:16px; height:16px; accent-color:var(--accent); flex-shrink:0; cursor:pointer; }
+    .consent-wrap label { font-size:.83rem; color:#374151; line-height:1.45; cursor:pointer; }
+    .consent-link { color:var(--accent); font-weight:700; background:none; border:none; font:inherit; cursor:pointer; text-decoration:underline; padding:0; }
+    /* T&C Modal */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1000; align-items:center; justify-content:center; padding:16px; }
+    .modal-overlay.open { display:flex; }
+    .modal-box { background:#fff; border-radius:24px; max-width:560px; width:100%; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 24px 64px rgba(0,0,0,.25); }
+    .modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .modal-header h2 { font-size:1.05rem; }
+    .modal-close { background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--muted); padding:4px 8px; border-radius:8px; line-height:1; }
+    .modal-close:hover { background:#f3f4f6; }
+    .modal-body { overflow-y:auto; padding:20px 24px; font-size:.86rem; color:#374151; line-height:1.7; flex:1; }
+    .modal-body h2 { font-size:.95rem; font-weight:700; margin:20px 0 6px; color:var(--text); }
+    .modal-body h2:first-child { margin-top:0; }
+    .modal-body ul { padding-left:20px; margin:6px 0 12px; }
+    .modal-body li { margin-bottom:4px; }
+    .modal-footer { padding:16px 24px; border-top:1px solid var(--border); flex-shrink:0; }
   </style>
 </head>
 <body class="bg-auth animate-fade">
@@ -61,6 +79,16 @@
           </div>
         </div>
 
+        <!-- Consent checkbox — shown only on registration -->
+        <div id="consent-wrap" class="consent-wrap" style="display:none">
+          <input type="checkbox" id="consent-check">
+          <label for="consent-check">
+            J'ai lu et j'accepte les
+            <button type="button" class="consent-link" id="open-tc">Conditions Générales d'Utilisation</button>
+            et le traitement de mes données personnelles conformément au RGPD.
+          </label>
+        </div>
+
         <div id="status-msg" style="display:none"></div>
 
         <button type="submit" id="submit-btn" class="btn btn-primary btn-lg btn-full">
@@ -78,6 +106,76 @@
     <div class="trusted">
       <span>🔒 Sécurisé &amp; Privé</span>
       <span>💙 100% Gratuit</span>
+    </div>
+  </div>
+
+  <!-- Terms & Conditions Modal -->
+  <div class="modal-overlay" id="tc-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>📋 Conditions Générales d'Utilisation &amp; Confidentialité</h2>
+        <button class="modal-close" id="close-tc">✕</button>
+      </div>
+      <div class="modal-body">
+        <h2>1. Objet de la plateforme</h2>
+        <p>Cette plateforme met en relation des seniors demandant de l'aide avec des bénévoles qui choisissent d'apporter leur soutien sur la base du volontariat.</p>
+
+        <h2>2. Données collectées</h2>
+        <p>Pour fournir nos services, nous pouvons collecter :</p>
+        <ul>
+          <li>Votre nom et vos coordonnées.</li>
+          <li>Votre tranche d'âge et votre rôle (Senior ou Bénévole).</li>
+          <li>Les informations relatives aux demandes d'aide.</li>
+          <li>Les messages et interactions vocales avec notre assistant IA.</li>
+          <li>L'historique des tâches, y compris les activités bénévoles accomplies.</li>
+          <li>Les informations de vérification nécessaires aux rencontres sécurisées.</li>
+        </ul>
+
+        <h2>3. Utilisation de vos données</h2>
+        <p>Vos données personnelles sont utilisées uniquement pour :</p>
+        <ul>
+          <li>Mettre en relation les seniors avec des bénévoles adaptés.</li>
+          <li>Traiter et gérer les demandes d'aide.</li>
+          <li>Vérifier l'identité des utilisateurs lors des interactions.</li>
+          <li>Améliorer la qualité et la sécurité de la plateforme.</li>
+          <li>Générer des statistiques anonymisées sur l'utilisation.</li>
+        </ul>
+
+        <h2>4. Partage des données</h2>
+        <p>Vos données personnelles ne seront jamais vendues. Le cas échéant et dans les limites autorisées par la loi, des informations limitées concernant les activités bénévoles accomplies pourront être partagées avec des autorités publiques ou des organisations partenaires à des fins de reconnaissance ou de statistiques.</p>
+
+        <h2>5. Traitement par IA</h2>
+        <p>La plateforme utilise l'Intelligence Artificielle pour transformer les demandes vocales ou textuelles en descriptions de tâches claires. Le contenu généré par l'IA peut être revu pour garantir son exactitude et sa sécurité.</p>
+
+        <h2>6. Sécurité des données</h2>
+        <p>Nous mettons en œuvre des mesures techniques et organisationnelles appropriées pour protéger vos données personnelles contre tout accès non autorisé, perte ou utilisation abusive.</p>
+
+        <h2>7. Vos droits (RGPD)</h2>
+        <p>Conformément au Règlement Général sur la Protection des Données, vous disposez du droit de :</p>
+        <ul>
+          <li>Accéder à vos données personnelles.</li>
+          <li>Corriger les informations inexactes.</li>
+          <li>Demander la suppression de votre compte et de vos données.</li>
+          <li>Retirer votre consentement à tout moment.</li>
+          <li>Obtenir une copie de vos données personnelles.</li>
+          <li>Vous opposer à certains traitements ou en demander la limitation.</li>
+        </ul>
+
+        <h2>8. Suppression du compte</h2>
+        <p>Vous pouvez supprimer votre compte à tout moment depuis les paramètres de votre profil. Vos données personnelles seront supprimées, sauf obligation légale de conservation.</p>
+
+        <h2>9. Responsabilités des utilisateurs</h2>
+        <p>Les utilisateurs s'engagent à :</p>
+        <ul>
+          <li>Fournir des informations exactes.</li>
+          <li>Respecter les autres utilisateurs.</li>
+          <li>Utiliser la plateforme uniquement pour des demandes d'aide légitimes.</li>
+          <li>Suivre les procédures de vérification d'identité avant toute rencontre.</li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-full" id="accept-tc">J'ai lu et j'accepte ✓</button>
+      </div>
     </div>
   </div>
 

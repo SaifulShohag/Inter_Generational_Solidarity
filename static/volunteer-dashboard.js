@@ -21,6 +21,18 @@ document.getElementById('logout-link').addEventListener('click', e => {
   window.location.href = '/index.html';
 });
 
+document.getElementById('delete-account-link').addEventListener('click', async e => {
+  e.preventDefault();
+  if (!confirm('Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible et supprimera toutes vos données.')) return;
+  const res = await fetch(`${API}/auth/me`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+  if (res.ok) {
+    ['vfa_token','vfa_role','vfa_api_user','vfa_session_id'].forEach(k => localStorage.removeItem(k));
+    window.location.href = '/index.html';
+  } else {
+    alert('Impossible de supprimer le compte. Veuillez réessayer.');
+  }
+});
+
 const catIcon   = { medical:'🏥', grocery:'🛒', cleaning:'🧹', transport:'🚗', other:'💬' };
 
 let userLat = null;
