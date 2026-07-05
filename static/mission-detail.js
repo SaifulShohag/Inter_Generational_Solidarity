@@ -18,6 +18,16 @@ const priCfg   = {
   low:    { label:'🟢 Faible',  cls:'badge priority-low',    bar:'var(--success)' },
 };
 
+function meetingCodeHtml(code) {
+  if (!code) return '';
+  return `
+    <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:2px solid #0ea5e9;border-radius:16px;padding:18px 20px;text-align:center;margin-bottom:4px">
+      <p style="font-size:.78rem;font-weight:700;color:#0369a1;letter-spacing:.1em;margin-bottom:6px">🤝 CODE DE RENCONTRE</p>
+      <p style="font-size:2.2rem;font-weight:800;letter-spacing:.25em;color:#0c4a6e;font-family:monospace">${code}</p>
+      <p style="font-size:.78rem;color:#0369a1;margin-top:6px">Montrez ce code au bénéficiaire pour confirmer que vous êtes le bon bénévole</p>
+    </div>`;
+}
+
 async function load() {
   const res = await fetch(`${API}/requests/${id}`, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
@@ -33,7 +43,6 @@ async function load() {
 
   const page = document.getElementById('page');
   page.innerHTML = `
-    <!-- Banner -->
     <div class="banner">
       <img src="https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=800&h=300&fit=crop&q=70" alt="${r.title}">
       <div class="banner-overlay"></div>
@@ -44,7 +53,6 @@ async function load() {
     </div>
 
     <div class="content animate-slide">
-      <!-- Title -->
       <div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span style="font-size:1.4rem">${ic}</span>
@@ -54,7 +62,6 @@ async function load() {
         <p style="color:var(--muted);font-size:.83rem;margin-top:4px">Demande #${r.id} · Créée le ${new Date(r.created_at).toLocaleDateString('fr-FR')}</p>
       </div>
 
-      <!-- Requester -->
       <div class="requester-card">
         <div class="avatar avatar-lg" style="background:var(--accent-light);color:var(--accent)">👴</div>
         <div class="req-info">
@@ -63,13 +70,11 @@ async function load() {
         </div>
       </div>
 
-      <!-- Description -->
       <div>
         <h3 style="margin-bottom:10px">Description de la mission</h3>
         <p style="color:#374151;line-height:1.65;font-size:.95rem">${r.description}</p>
       </div>
 
-      <!-- Detail grid -->
       <div class="detail-grid">
         <div class="detail-box">
           <div class="label">📅 Date prévue</div>
@@ -81,24 +86,28 @@ async function load() {
         </div>
       </div>
 
-      <!-- Warning -->
       <div class="warning-box">
         <span>⚠️</span>
         <p>En acceptant cette mission, vous vous engagez à vous présenter à l'heure. Si vous ne pouvez pas venir, merci d'annuler au moins 2 heures à l'avance.</p>
       </div>
 
-      <!-- Status info if already assigned -->
       ${assignment ? `
+        ${meetingCodeHtml(assignment.meeting_code)}
         <div class="alert alert-info" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
           <span>✅ Mission acceptée${assignment.eta_minutes ? ` · ETA : ${assignment.eta_minutes} min` : ''}</span>
           ${r.status === 'accepted' || r.status === 'in_progress' ? `<button class="btn btn-success btn-sm" id="complete-btn">Marquer terminée</button>` : ''}
           ${r.status === 'completed' ? `<span class="badge badge-green">✅ Terminée</span>` : ''}
-        </div>` : ''}
+        </div>
+        ${r.status === 'accepted' || r.status === 'in_progress' ? `
+          <div id="withdraw-section" style="margin-top:8px">
+            <button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5" id="withdraw-toggle">
+              Je ne peux plus faire cette mission
+            </button>
+          </div>` : ''}` : ''}
 
       <div id="accepted-state"></div>
     </div>
 
-    <!-- Sticky footer -->
     <div class="sticky-footer" id="accept-footer" style="${assignment ? 'display:none' : ''}">
       <div class="eta-input">
         <input id="eta" type="number" min="0" max="240" placeholder="ETA en minutes (ex: 15)" />
@@ -109,6 +118,24 @@ async function load() {
 
   document.getElementById('accept-btn')?.addEventListener('click', acceptMission);
   document.getElementById('complete-btn')?.addEventListener('click', completeMission);
+
+  document.getElementById('withdraw-toggle')?.addEventListener('click', () => {
+    const sec = document.getElementById('withdraw-section');
+    sec.innerHTML = `
+      <div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:12px;padding:14px;margin-top:4px">
+        <p style="font-size:.85rem;font-weight:600;color:#dc2626;margin-bottom:8px">Expliquez pourquoi vous vous retirez :</p>
+        <textarea id="withdraw-reason" rows="3" placeholder="Ex : Je suis malade, je ne peux pas venir..." style="width:100%;border:1px solid #fca5a5;border-radius:8px;padding:8px;font-size:.9rem;resize:vertical;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-ghost btn-sm" id="withdraw-cancel-btn">Annuler</button>
+          <button class="btn btn-sm" style="background:#dc2626;color:#fff;flex:1" id="withdraw-confirm-btn">Confirmer le retrait</button>
+        </div>
+      </div>`;
+    document.getElementById('withdraw-cancel-btn').addEventListener('click', () => {
+      sec.innerHTML = `<button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5" id="withdraw-toggle">Je ne peux plus faire cette mission</button>`;
+      document.getElementById('withdraw-toggle').addEventListener('click', arguments.callee.caller);
+    });
+    document.getElementById('withdraw-confirm-btn').addEventListener('click', withdrawMission);
+  });
 }
 
 async function acceptMission() {
@@ -131,18 +158,19 @@ async function acceptMission() {
     const alert = document.createElement('div');
     alert.className = 'alert alert-error';
     alert.style.cssText = 'margin:0 16px 12px';
-    alert.textContent = err.detail || 'Impossible d\'accepter cette mission.';
+    alert.textContent = err.detail || "Impossible d'accepter cette mission.";
     footer.insertAdjacentElement('beforebegin', alert);
     return;
   }
 
-  // Show success state
+  const assignment = await res.json();
   document.getElementById('accept-footer').style.display = 'none';
   document.getElementById('accepted-state').innerHTML = `
     <div class="success-state animate-slide">
       <div class="emoji">🎉</div>
       <h3>Mission acceptée !</h3>
-      <p>Le bénéficiaire a été notifié. Vous êtes formidable !</p>
+      ${meetingCodeHtml(assignment.meeting_code)}
+      <p style="margin-top:12px">Le bénéficiaire a été notifié. Vous êtes formidable !</p>
       <button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="window.location.href='/missions.html'">Retour aux missions</button>
     </div>`;
 }
@@ -165,6 +193,38 @@ async function completeMission() {
     btn?.closest('.alert')?.remove();
   } else {
     if (btn) { btn.disabled = false; btn.textContent = 'Marquer terminée'; }
+  }
+}
+
+async function withdrawMission() {
+  const reason = document.getElementById('withdraw-reason')?.value?.trim();
+  if (!reason || reason.length < 10) {
+    alert('Veuillez écrire une explication d\'au moins 10 caractères.');
+    return;
+  }
+  const btn = document.getElementById('withdraw-confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const res = await fetch(`${API}/requests/${id}/withdraw`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason })
+  });
+
+  if (res.ok) {
+    document.getElementById('page').innerHTML = `
+      <div class="content animate-slide" style="text-align:center;padding-top:60px">
+        <div style="font-size:3rem;margin-bottom:16px">✅</div>
+        <h2>Retrait confirmé</h2>
+        <p style="color:var(--muted);margin-top:8px">La mission a été remise en ligne pour d'autres bénévoles.</p>
+        <button class="btn btn-ghost btn-sm" style="margin-top:24px" onclick="window.location.href='/accepted-missions.html'">Mes missions</button>
+      </div>`;
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Confirmer le retrait';
+    const err = await res.json().catch(() => ({}));
+    alert(err.detail || 'Erreur lors du retrait.');
   }
 }
 

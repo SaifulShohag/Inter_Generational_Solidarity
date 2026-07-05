@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Integer, Float, DateTime, ForeignKey, CheckConstraint
+from sqlalchemy import Integer, Float, DateTime, String, ForeignKey, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from app.services.database import Base
 
@@ -20,3 +20,4 @@ class VolunteerAssignment(Base):
     completed_at:          Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     volunteer_current_lat: Mapped[float | None]    = mapped_column(Float)
     volunteer_current_lng: Mapped[float | None]    = mapped_column(Float)
+    meeting_code:          Mapped[str | None]      = mapped_column(String(8))

@@ -75,8 +75,18 @@ function wireStars(reqId) {
   }
 }
 
+function meetingCodeHtml(code) {
+  if (!code) return '';
+  return `
+    <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:2px solid #0ea5e9;border-radius:12px;padding:12px 14px;text-align:center;margin-bottom:10px">
+      <p style="font-size:.72rem;font-weight:700;color:#0369a1;letter-spacing:.1em;margin-bottom:4px">🤝 CODE DE RENCONTRE</p>
+      <p style="font-size:1.7rem;font-weight:800;letter-spacing:.2em;color:#0c4a6e;font-family:monospace;margin:0">${code}</p>
+      <p style="font-size:.72rem;color:#0369a1;margin-top:4px">Demandez ce code à votre bénévole pour confirmer la mise en relation</p>
+    </div>`;
+}
+
 async function load() {
-  // Fetch requests and already-submitted reviews in parallel
+  // Fetch requests, their assignments (for meeting codes), and reviews in parallel
   const [reqRes, revRes] = await Promise.all([
     fetch(`${API}/requests/mine`, { headers: { Authorization: `Bearer ${token}` } }),
     fetch(`${API}/users/${userId}/reviews?as_reviewer=true`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -89,8 +99,23 @@ async function load() {
 
   const items    = await reqRes.json();
   const myReviews = revRes.ok ? await revRes.json() : [];
-  // Set of request_ids already reviewed by this user
   const reviewedRequestIds = new Set(myReviews.map(rv => rv.request_id));
+
+  // Fetch assignment for each accepted/in_progress request to get meeting code
+  const assignmentMap = {};
+  await Promise.all(
+    items
+      .filter(r => ['accepted','in_progress'].includes(r.status))
+      .map(async r => {
+        try {
+          const d = await fetch(`${API}/requests/${r.id}`, { headers: { Authorization: `Bearer ${token}` } });
+          if (d.ok) {
+            const { assignment } = await d.json();
+            if (assignment) assignmentMap[r.id] = assignment;
+          }
+        } catch {}
+      })
+  );
 
   const label = document.getElementById('count-label');
   const done  = items.filter(i => i.status === 'completed').length;
@@ -111,16 +136,26 @@ async function load() {
     const ic  = catIcon[r.category]     || '💬';
     const dt  = new Date(r.scheduled_at).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
     const created = new Date(r.created_at).toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
+    const assignment = assignmentMap[r.id];
 
     let footer = '';
     if (r.status === 'completed') {
       footer = reviewedRequestIds.has(r.id) ? alreadyReviewedHtml() : starWidget(r.id);
       if (!reviewedRequestIds.has(r.id)) toWire.push(r.id);
-    } else if (['pending','accepted','in_progress'].includes(r.status)) {
-      footer = `<button class="continue-btn" onclick="window.location.href='/chat.html'">💬 Voir la conversation</button>`;
+    } else if (['accepted','in_progress'].includes(r.status)) {
+      footer = `
+        ${meetingCodeHtml(assignment?.meeting_code)}
+        <button class="continue-btn" onclick="window.location.href='/chat.html'">💬 Voir la conversation</button>`;
+    } else if (r.status === 'pending') {
+      footer = `
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="continue-btn" onclick="window.location.href='/chat.html'">💬 Voir la conversation</button>
+          <button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5" id="cancel-btn-${r.id}">Annuler la demande</button>
+        </div>`;
     }
 
     const card = document.createElement('div');
+    card.id = `card-${r.id}`;
     card.className = 'hist-item animate-slide';
     card.innerHTML = `
       <div class="status-bar" style="background:${sc.bar}"></div>
@@ -146,6 +181,35 @@ async function load() {
   });
 
   toWire.forEach(id => wireStars(id));
+
+  // Wire cancel buttons
+  items.filter(r => r.status === 'pending').forEach(r => {
+    const btn = document.getElementById(`cancel-btn-${r.id}`);
+    if (btn) btn.addEventListener('click', () => cancelRequest(r.id));
+  });
+}
+
+async function cancelRequest(reqId) {
+  if (!confirm('Êtes-vous sûr de vouloir annuler cette demande ?')) return;
+  const btn = document.getElementById(`cancel-btn-${reqId}`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span>'; }
+
+  const res = await fetch(`${API}/requests/${reqId}/cancel`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (res.ok) {
+    const card = document.getElementById(`card-${reqId}`);
+    if (card) {
+      card.style.opacity = '0.5';
+      card.style.transition = 'opacity .3s';
+      setTimeout(() => card.remove(), 300);
+    }
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = 'Annuler la demande'; }
+    const err = await res.json().catch(() => ({}));
+    alert(err.detail || 'Impossible d\'annuler cette demande.');
+  }
 }
 
 load();
