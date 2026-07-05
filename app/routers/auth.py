@@ -11,7 +11,6 @@ from app.models.review import Review
 from app.schemas.user import UserRegister, UserLogin, UserOut
 from app.services.auth_service import hash_password, verify_password, create_access_token
 from app.config import settings
-from app.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -30,7 +29,6 @@ def _set_auth_cookie(response: Response, token: str) -> None:
 
 
 @router.post("/register")
-@limiter.limit("10/minute")
 async def register(request: Request, body: UserRegister, response: Response, db: AsyncSession = Depends(get_db)):
     existing = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if existing:
@@ -52,7 +50,6 @@ async def register(request: Request, body: UserRegister, response: Response, db:
 
 
 @router.post("/login")
-@limiter.limit("10/minute")          # brute-force protection: 10 attempts per minute per IP
 async def login(request: Request, body: UserLogin, response: Response, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email))
     user   = result.scalar_one_or_none()
@@ -112,4 +109,4 @@ async def delete_account(
     if response:
         response.delete_cookie("access_token", path="/", samesite="lax")
 
-    return {"ok": True, "message": "Account deleted"}
+    return {"ok": True, "message": "Account deleted"} 

@@ -4,11 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-
 from app.config import settings
-from app.limiter import limiter
 from app.services.database import engine, Base
 from app.routers import auth, conversations, location, reviews
 from app.routers import help_requests
@@ -25,10 +21,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="HelpMe API", version="1.0.0", lifespan=lifespan)
-
-# ── Rate limiter ──────────────────────────────────────────────────────────────
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 # allow_credentials=True requires explicit origins (not ["*"])
