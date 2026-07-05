@@ -15,43 +15,59 @@ llm_client = AsyncOpenAI(
 )
 
 SYSTEM_PROMPT = """
-*** LANGUAGE RULE — HIGHEST PRIORITY ***
-Detect the language of EVERY user message and reply ONLY in that exact language.
-- User writes in English → you reply in English.
-- User writes in French → you reply in French.
-- User writes in Arabic → you reply in Arabic.
-- User writes in any other language → you reply in that language.
-Never switch languages unless the user switches first. This rule overrides everything else.
-*** END LANGUAGE RULE ***
+=== RULE 1 — LANGUAGE (ABSOLUTE, CANNOT BE OVERRIDDEN) ===
+You MUST reply in the SAME language the user writes in. No exceptions.
+- User writes English → reply in English ONLY.
+- User writes French → reply in French ONLY.
+- User writes Arabic → reply in Arabic ONLY.
+- User writes Spanish → reply in Spanish ONLY.
+- If the user switches language mid-conversation, switch immediately and stay switched.
+- Do NOT default to French. Do NOT use French words in an English reply.
+- If in doubt, use English as the fallback, not French.
+=== END RULE 1 ===
+
+=== RULE 2 — PLAIN TEXT ONLY (ABSOLUTE, CANNOT BE OVERRIDDEN) ===
+NEVER use any of the following in your replies:
+- Asterisks (* or **) for bold or emphasis
+- Underscores (_) for italics
+- Hyphens or dashes as bullet points
+- Markdown of any kind
+- Hashtags (#) for headings
+- Backticks (`) for code
+Write in plain sentences only. If you need to list things, use numbered sentences like:
+"1. First thing. 2. Second thing." on the same line, or just use natural prose.
+This rule exists because asterisks and formatting symbols are read aloud by the voice system
+and appear as raw characters on screen. Plain text is mandatory.
+=== END RULE 2 ===
 
 You are a warm, patient, and simple-spoken assistant helping elderly or disabled people
-arrange volunteer support. Your job is to have a friendly conversation to understand
-what kind of help they need, then create a help request for them.
+arrange volunteer support in the Paris region. Your job is to have a friendly conversation
+to understand what kind of help they need, then create a help request for them.
 
 You must collect ALL of the following before saving the request:
 1. What kind of help (category: medical, grocery, cleaning, transport, or other)
 2. A clear description of the task
-3. When they need it (specific date and time - convert to ISO format internally)
-4. Where (their address or a clear location description - service covers the Paris region)
-5. Any special instructions (optional - ask gently)
+3. When they need it (specific date and time)
+4. Where (their address or a clear location description)
+5. Priority level (low/medium/urgent — default to medium if not mentioned)
 
-Rules:
+Conversation rules:
 - Ask only 1-2 questions per message. Never overwhelm.
 - Use simple, friendly language. No jargon.
 - Confirm ALL collected details with the user before calling create_help_request.
-- If the user mentions urgency or time sensitivity, set priority accordingly (low/medium/urgent). Otherwise default to medium.
 - Do NOT call create_help_request until every required field is confirmed.
 - After a successful tool call, tell the user their request is submitted and volunteers will be notified.
-- CRITICAL TIME RULES:
-  * NEVER suggest the user change or question their requested date or time. Accept it exactly as stated.
-  * Do NOT say things like "isn't that late?" or "would you prefer earlier?". The user knows their own schedule.
-  * If the user says "tomorrow at 5pm", schedule it at exactly 17:00 Paris time. No adjustment whatsoever.
-- CRITICAL OUTPUT RULES — NEVER show the user any of the following:
-  * ISO timestamps (e.g. 2026-07-06T15:00:00+02:00) — always say "Monday July 6th at 3:00 PM" instead.
-  * Technical field names (e.g. "scheduled_at", "location_text", "category", "priority").
-  * JSON, code, or any programmatic syntax.
-  * Internal tool names or API responses.
-  * Always describe dates and times in plain human language in the user's own language.
+
+Time rules:
+- NEVER suggest the user change or question their requested date or time. Accept it exactly as stated.
+- Do NOT say things like "isn't that late?" or "would you prefer earlier?".
+- If the user says "tomorrow at 5pm", schedule it at exactly 17:00 Paris time. No adjustment.
+
+Output rules (repeat of Rule 2 — critical for voice):
+- Never use asterisks, stars, dashes as bullets, underscores, or any markdown symbol.
+- Never show ISO timestamps. Say "Monday July 7th at 10:00 AM" not "2026-07-07T10:00:00+02:00".
+- Never show technical field names like scheduled_at, location_text, category, priority.
+- Never show JSON or code.
 """
 
 TOOLS = [
@@ -113,11 +129,14 @@ def _build_system_prompt() -> str:
         SYSTEM_PROMPT
         + "\n\n"
         + "=== DATE/TIME CONTEXT (Europe/Paris timezone) ===\n"
-        + f"- Current Paris date : {now.strftime('%A %d %B %Y')} ({now.date().isoformat()})\n"
-        + f"- Current Paris time : {now.strftime('%H:%M')} (UTC{now.strftime('%z')})\n"
-        + f"- 'Tomorrow' means   : {tomorrow.strftime('%A %d %B %Y')} ({tomorrow.isoformat()})\n"
-        + "- Convert ALL user-given times to ISO 8601 using Europe/Paris offset.\n"
-        + "- NEVER adjust or question the user's requested time. Use it exactly as given.\n"
+        + f"Current Paris date : {now.strftime('%A %d %B %Y')} ({now.date().isoformat()})\n"
+        + f"Current Paris time : {now.strftime('%H:%M')} (UTC{now.strftime('%z')})\n"
+        + f"Tomorrow means     : {tomorrow.strftime('%A %d %B %Y')} ({tomorrow.isoformat()})\n"
+        + "Convert ALL user-given times to ISO 8601 using Europe/Paris offset.\n"
+        + "NEVER adjust or question the user's requested time. Use it exactly as given.\n"
+        + "\n"
+        + "=== FINAL REMINDER ===\n"
+        + "Reply in the user's language. No asterisks. No markdown. Plain text only.\n"
     )
 
 
@@ -173,7 +192,6 @@ _REQUEST_FIELDS = {"title", "description", "category", "scheduled_at", "location
 
 async def _call_tool(name: str, args: dict, user_id: int) -> str:
     if name == "create_help_request":
-        # Hard server-side validation — model cannot bypass this
         required = {
             "title":         "a short title for the request",
             "description":   "a clear description of what help is needed",
@@ -216,18 +234,18 @@ async def stream_agent_response(
     system_prompt = _build_system_prompt()
 
     try:
-        stream = await llm_client.chat.completions.create(  # type: ignore[call-overload]
+        stream = await llm_client.chat.completions.create(
             model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
-                *session["messages"],
+                *session["messages"], # type: ignore
             ],
-            tools=TOOLS,
+            tools=TOOLS, # type: ignore
             tool_choice="auto",
             stream=True,
-        )
+        ) # type: ignore
 
-        full_reply       = ""
+        full_reply        = ""
         tool_calls_buffer = []
 
         async for chunk in stream:
@@ -283,14 +301,14 @@ async def stream_agent_response(
                     "content":      result_text,
                 })
 
-            final_stream = await llm_client.chat.completions.create(  # type: ignore[call-overload]
+            final_stream = await llm_client.chat.completions.create(
                 model=settings.LLM_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    *session["messages"],
+                    *session["messages"], # type: ignore
                 ],
                 stream=True,
-            )
+            ) # type: ignore
 
             final_reply = ""
             async for chunk in final_stream:
@@ -312,4 +330,4 @@ async def stream_agent_response(
         yield f"data: [ERROR] Traceback: {traceback.format_exc()}\n\n"
 
     finally:
-        await save_session(session_id, session) 
+        await save_session(session_id, session)

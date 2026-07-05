@@ -9,8 +9,8 @@ from app.services.database import engine, Base
 from app.routers import auth, conversations, location, reviews
 from app.routers import help_requests
 
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+# if sys.platform == "win32":
+#     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 
 @asynccontextmanager

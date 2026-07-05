@@ -357,6 +357,7 @@ async function sendMessage(text) {
       // Remove cursor; if reply ended up empty, remove the bubble entirely
       if (fullReply.trim()) {
         streamingBubble.textContent = fullReply;
+        document.getElementById('streaming-row')?.removeAttribute('id');
       } else {
         document.getElementById('streaming-row')?.remove();
         streamingBubble = null;
@@ -391,9 +392,14 @@ async function sendMessage(text) {
     }
 
   } catch (err) {
-    removeTypingIndicator();
-    if (streamingBubble) streamingBubble.textContent = '⚠️ Erreur. Veuillez réessayer.';
-    else addBubble('agent', '⚠️ Erreur. Veuillez réessayer.');
+    document.getElementById('typing-row')?.remove();
+    
+    if (streamingBubble) {
+      streamingBubble.textContent += ' (⚠️ Erreur de connexion)';
+      document.getElementById('streaming-row')?.removeAttribute('id');
+    } else {
+      addBubble('agent', '⚠️ Erreur. Veuillez réessayer.');
+    }
   } finally {
     isBusy = false;
     setComposerEnabled(true);
@@ -418,7 +424,7 @@ document.getElementById('new-chat-btn2').addEventListener('click', startNewSessi
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = SR ? new SR() : null;
 if (recognition) {
-  recognition.lang = 'fr-FR';
+  recognition.lang = navigator.language || 'fr-FR';
   recognition.continuous = false;
   recognition.interimResults = true;
 
