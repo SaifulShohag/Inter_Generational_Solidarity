@@ -116,7 +116,7 @@ Data (SQLite database + encrypted conversation files) is stored in a Docker volu
 
 ---
 
-## Backend Setup (Python / FastAPI)
+## Running without Docker (Python / FastAPI)
 
 ### Prerequisites
 
@@ -160,6 +160,7 @@ This creates `helpme.db` with the tables:
 | `volunteer_assignments` | Volunteer–request matches with meeting code |
 | `reviews` | Post-mission star ratings |
 
+### 5. Start the server
 ### 5. Start the server
 
 ```bash
