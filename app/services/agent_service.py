@@ -46,6 +46,12 @@ Rules:
   * NEVER suggest the user change or question their requested date or time. Accept it exactly as stated.
   * Do NOT say things like "isn't that late?" or "would you prefer earlier?". The user knows their own schedule.
   * If the user says "tomorrow at 5pm", schedule it at exactly 17:00 Paris time. No adjustment whatsoever.
+- CRITICAL OUTPUT RULES — NEVER show the user any of the following:
+  * ISO timestamps (e.g. 2026-07-06T15:00:00+02:00) — always say "Monday July 6th at 3:00 PM" instead.
+  * Technical field names (e.g. "scheduled_at", "location_text", "category", "priority").
+  * JSON, code, or any programmatic syntax.
+  * Internal tool names or API responses.
+  * Always describe dates and times in plain human language in the user's own language.
 """
 
 TOOLS = [
@@ -165,6 +171,26 @@ def _normalize_tool_messages(messages: list[dict]) -> list[dict]:
 
 async def _call_tool(name: str, args: dict, user_id: int) -> str:
     if name == "create_help_request":
+        # Hard server-side validation — model cannot bypass this
+        required = {
+            "title":         "a short title for the request",
+            "description":   "a clear description of what help is needed",
+            "category":      "the category (medical/grocery/cleaning/transport/other)",
+            "scheduled_at":  "the exact date and time (e.g. 2026-07-06T15:00:00+02:00)",
+            "location_text": "the full address or location",
+            "priority":      "the priority level (low/medium/urgent)",
+        }
+        missing = [f"'{k}' ({hint})" for k, hint in required.items()
+                   if not args.get(k) or str(args[k]).strip() in ("", "unknown", "null", "none")]
+        if missing:
+            return json.dumps({
+                "ok": False,
+                "message": (
+                    "REFUSED: Cannot submit request yet. "
+                    f"You must still collect the following from the user: {', '.join(missing)}. "
+                    "Ask the user for this information before trying again."
+                )
+            })
         clean = {k: v for k, v in args.items() if v is not None and k not in {"user_id", "latitude", "longitude"}}
         clean["user_id"] = str(user_id)
         return await create_help_request(**clean)
@@ -192,9 +218,9 @@ async def stream_agent_response(
             model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
-                *session["messages"], # pyright: ignore[reportArgumentType]
+                *session["messages"],
             ],
-            tools=TOOLS, # pyright: ignore[reportArgumentType]
+            tools=TOOLS,
             tool_choice="auto",
             stream=True,
         )
@@ -254,7 +280,7 @@ async def stream_agent_response(
                 model=settings.LLM_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    *session["messages"], # type: ignore
+                    *session["messages"],
                 ],
                 stream=True,
             )
@@ -279,4 +305,4 @@ async def stream_agent_response(
         yield f"data: [ERROR] Traceback: {traceback.format_exc()}\n\n"
 
     finally:
-        await save_session(session_id, session)
+        await save_session(session_id, session) 

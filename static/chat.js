@@ -21,6 +21,20 @@ const historyList   = document.getElementById('history-list');
 const successBanner = document.getElementById('success-banner');
 const ttsToggleBtn  = document.getElementById('tts-toggle');
 
+// ── Language detection for TTS ──
+function detectLang(text) {
+  const sample = text.slice(0, 300).toLowerCase();
+  const scores = {
+    'fr-FR': (sample.match(/\b(je|tu|il|nous|vous|ils|est|sont|avec|pour|dans|sur|une|les|des|mon|ma|ce|qui|que|pas|plus|bien|mais|bonjour|merci|votre|vous)\b/g) || []).length,
+    'en-US': (sample.match(/\b(the|is|are|was|were|have|has|will|would|can|could|should|this|that|your|with|from|they|their|hello|thank|please|request)\b/g) || []).length,
+    'ar-SA': (sample.match(/[\u0600-\u06FF]/g) || []).length,
+    'es-ES': (sample.match(/\b(el|la|los|las|es|son|con|para|que|por|una|del|hola|gracias|su|muy)\b/g) || []).length,
+  };
+  // Pick the language with the highest score; fall back to browser language
+  const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+  return best[1] > 0 ? best[0] : (navigator.language || 'fr-FR');
+}
+
 // ── TTS toggle ──
 const TTS_KEY = 'vfa_tts';
 let ttsEnabled = localStorage.getItem(TTS_KEY) !== 'off';
@@ -145,7 +159,7 @@ function removeTypingIndicator() {
   document.getElementById('streaming-row')?.remove();
 }
 
-// ── Load previous sessions ──
+// ── Load previous sessions — returns the list for init() to use ──
 async function loadSessions() {
   historyList.innerHTML = '<div class="history-empty">Chargement…</div>';
   try {
@@ -155,7 +169,7 @@ async function loadSessions() {
 
     if (!sessions.length) {
       historyList.innerHTML = '<div class="history-empty">Aucune conversation pour l\'instant.</div>';
-      return;
+      return sessions;
     }
     historyList.innerHTML = '';
     sessions.forEach(s => {
@@ -179,15 +193,16 @@ async function loadSessions() {
       item.addEventListener('click', () => loadSession(s.session_id));
       historyList.appendChild(item);
     });
+    return sessions;
   } catch {
     historyList.innerHTML = '<div class="history-empty">Impossible de charger les conversations.</div>';
+    return [];
   }
 }
 
 // ── Load a specific session's history ──
 async function loadSession(sessionId) {
   currentSessionId = sessionId;
-  localStorage.setItem(SESSION_KEY, sessionId);
   messagesEl.innerHTML = '';
   setComposerEnabled(false);
   successBanner.style.display = 'none';
@@ -214,7 +229,7 @@ async function loadSession(sessionId) {
     });
 
     if (data.status === 'completed' && data.request_id) {
-      successBanner.style.display = 'flex';
+      await verifyAndShowSuccess(data.request_id);
     }
 
     setComposerEnabled(true);
@@ -237,7 +252,6 @@ async function startNewSession() {
     });
     const data = await res.json();
     currentSessionId = data.session_id;
-    localStorage.setItem(SESSION_KEY, currentSessionId);
 
     addBubble('agent', 'Bonjour ! Je suis votre assistant. Comment puis-je vous aider aujourd\'hui ? 😊', true);
     setComposerEnabled(true);
@@ -245,6 +259,21 @@ async function startNewSession() {
   } catch (e) {
     addSystemMsg('⚠️ Impossible de démarrer une conversation. Vérifiez votre connexion.');
   }
+}
+
+// ── Verify request exists in DB before showing success banner ──
+async function verifyAndShowSuccess(requestId) {
+  try {
+    const res = await fetch(`${API}/requests/${requestId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (res.ok) {
+      const { request } = await res.json();
+      if (request && request.id) {
+        successBanner.style.display = 'flex';
+      }
+    }
+  } catch {}
 }
 
 function addSystemMsg(text) {
@@ -337,7 +366,18 @@ async function sendMessage(text) {
       removeTypingIndicator();
     }
     if (requestCreated) {
-      successBanner.style.display = 'flex';
+      // Re-fetch the session to get the real request_id from DB — never trust SSE alone
+      try {
+        const confirm = await fetch(`${API}/conversations/${currentSessionId}/history`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (confirm.ok) {
+          const session = await confirm.json();
+          if (session.status === 'completed' && session.request_id) {
+            await verifyAndShowSuccess(session.request_id);
+          }
+        }
+      } catch {}
       await loadSessions();
     }
 
@@ -345,7 +385,8 @@ async function sendMessage(text) {
     if (ttsEnabled && fullReply && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(fullReply);
-      u.lang = 'fr-FR'; u.rate = 0.9;
+      u.lang = detectLang(fullReply);
+      u.rate = 0.9;
       window.speechSynthesis.speak(u);
     }
 
@@ -420,30 +461,20 @@ if (recognition) {
   micBtn.disabled = true;
 }
 
-// ── Init: restore or start new ──
+// ── Init: load sessions from server, open most recent active one or start new ──
 (async function init() {
-  // Check URL param for voice mode
   const params = new URLSearchParams(window.location.search);
   if (params.get('mode') === 'voice') {
     setTimeout(() => { if (recognition) micBtn.click(); }, 800);
   }
 
-  const stored = localStorage.getItem(SESSION_KEY);
-  if (stored) {
-    // Verify session still exists
-    try {
-      const res = await fetch(`${API}/conversations/${stored}/history`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        await loadSessions();
-        await loadSession(stored);
-        return;
-      }
-    } catch {}
-    localStorage.removeItem(SESSION_KEY);
-  }
+  // Always get session list fresh from the server — no localStorage for session state
+  const sessions = await loadSessions();
+  const active   = sessions?.find(s => s.status === 'active');
 
-  await loadSessions();
-  await startNewSession();
-})();
+  if (active) {
+    await loadSession(active.session_id);
+  } else {
+    await startNewSession();
+  }
+})(); 
