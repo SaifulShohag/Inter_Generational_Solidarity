@@ -29,7 +29,6 @@ build/
 site/
 
 # Database / runtime data
-helpme.db
 *.db
 *.sqlite3
 conversations/*.json
