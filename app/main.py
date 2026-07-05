@@ -9,7 +9,7 @@ from app.routers import help_requests   # explicit import avoids shadowing stdli
 from fastapi.staticfiles import StaticFiles
 
 if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio._WindowsProactorEventLoopPolicy())
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
