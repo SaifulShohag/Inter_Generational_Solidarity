@@ -38,13 +38,25 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
+    from app.config import settings
+    
+    # Strip the async drivers (+asyncpg for Postgres, +aiosqlite for SQLite)
+    # This forces Alembic to use the standard synchronous drivers (psycopg2 / sqlite3)
+    db_url = settings.DATABASE_URL.replace("+asyncpg", "").replace("+aiosqlite", "")
+    config.set_main_option("sqlalchemy.url", db_url)
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection, target_metadata=target_metadata
+        )
+
         with context.begin_transaction():
             context.run_migrations()
 
