@@ -163,9 +163,11 @@ def _normalize_tool_messages(messages: list[dict]) -> list[dict]:
     return normalized
 
 
+_REQUEST_FIELDS = {"title", "description", "category", "scheduled_at", "location_text", "priority"}
+
 async def _call_tool(name: str, args: dict, user_id: int) -> str:
     if name == "create_help_request":
-        clean = {k: v for k, v in args.items() if v is not None and k not in {"user_id", "latitude", "longitude"}}
+        clean = {k: v for k, v in args.items() if k in _REQUEST_FIELDS and v is not None}
         clean["user_id"] = str(user_id)
         return await create_help_request(**clean)
     if name == "get_request_status":
@@ -212,13 +214,18 @@ async def stream_agent_response(
             if delta.tool_calls:
                 for tc in delta.tool_calls:
                     if tc.index >= len(tool_calls_buffer):
-                        tool_calls_buffer.append({"id": "", "type": "function", "name": "", "arguments": ""})
+                        tool_calls_buffer.append({
+                            "id": f"call_{tc.index}_{uuid.uuid4().hex[:8]}",
+                            "type": "function", "name": "", "arguments": ""
+                        })
                     if getattr(tc, "id", None):
                         tool_calls_buffer[tc.index]["id"] = tc.id
-                    if tc.function.name:
-                        tool_calls_buffer[tc.index]["name"] = tc.function.name
-                    if tc.function.arguments:
-                        tool_calls_buffer[tc.index]["arguments"] += tc.function.arguments
+                    fn = getattr(tc, "function", None)
+                    if fn:
+                        if getattr(fn, "name", None):
+                            tool_calls_buffer[tc.index]["name"] = fn.name
+                        if getattr(fn, "arguments", None):
+                            tool_calls_buffer[tc.index]["arguments"] += fn.arguments
 
         if tool_calls_buffer:
             session["messages"].append({
