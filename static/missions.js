@@ -22,9 +22,33 @@ const priCfg = {
 };
 
 let allRequests = [];
-let activeCat = 'all';
-let activePri = 'all';
-let searchQ   = '';
+let activeCat  = 'all';
+let activePri  = 'all';
+let searchQ    = '';
+let userLat    = null;
+let userLng    = null;
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function distLabel(km) {
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  return `${km.toFixed(1)} km`;
+}
+
+navigator.geolocation?.getCurrentPosition(
+  pos => {
+    userLat = pos.coords.latitude;
+    userLng = pos.coords.longitude;
+    render(); // re-render sorted by distance once we have location
+  },
+  () => {} // silently ignore if denied
+);
 
 // Build category chips
 const cats = [
@@ -77,14 +101,22 @@ pris.forEach(p => {
 document.getElementById('search').addEventListener('input', e => { searchQ = e.target.value.toLowerCase(); render(); });
 
 function render() {
-  const filtered = allRequests.filter(r => {
+  let filtered = allRequests.filter(r => {
     if (activeCat !== 'all' && r.category !== activeCat) return false;
     if (activePri !== 'all' && r.priority !== activePri) return false;
     if (searchQ && !r.title.toLowerCase().includes(searchQ) && !r.description.toLowerCase().includes(searchQ)) return false;
     return true;
   });
 
-  document.getElementById('count-label').textContent = `${filtered.length} mission${filtered.length !== 1 ? 's' : ''} trouvée${filtered.length !== 1 ? 's' : ''}`;
+  // Sort by distance if geolocation is available, otherwise by date
+  if (userLat !== null) {
+    filtered = filtered.map(r => ({
+      ...r,
+      _dist: (r.latitude && r.longitude) ? haversineKm(userLat, userLng, r.latitude, r.longitude) : Infinity
+    })).sort((a, b) => a._dist - b._dist);
+  }
+
+  document.getElementById('count-label').textContent = `${filtered.length} mission${filtered.length !== 1 ? 's' : ''} trouvée${filtered.length !== 1 ? 's' : ''}${userLat !== null ? ' · triées par distance' : ''}`;
 
   if (!filtered.length) {
     document.getElementById('missions-list').innerHTML = '<div class="empty-state"><div style="font-size:3rem;margin-bottom:14px">🔍</div><h3 style="margin-bottom:6px">Aucune mission trouvée</h3><p>Essayez de modifier vos filtres</p></div>';
@@ -92,9 +124,10 @@ function render() {
   }
 
   document.getElementById('missions-list').innerHTML = filtered.map(r => {
-    const ic  = catIcon[r.category] || '💬';
-    const pc  = priCfg[r.priority]  || priCfg.medium;
-    const dt  = new Date(r.scheduled_at).toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const ic   = catIcon[r.category] || '💬';
+    const pc   = priCfg[r.priority]  || priCfg.medium;
+    const dt   = new Date(r.scheduled_at).toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const dist = (userLat !== null && r._dist !== Infinity) ? `📏 ${distLabel(r._dist)}` : `📍 ${r.location_text}`;
     return `
     <div class="mission-item animate-slide" onclick="window.location.href='/mission-detail.html?id=${r.id}'">
       <div style="height:4px;background:${pc.bar}"></div>
@@ -108,7 +141,7 @@ function render() {
         </div>
         <div class="mission-meta">
           <span>📅 ${dt}</span>
-          <span>📍 ${r.location_text}</span>
+          <span>${dist}</span>
           <span>🏷️ ${catLabel[r.category] || 'Autre'}</span>
         </div>
       </div>

@@ -22,6 +22,22 @@ document.getElementById('logout-link').addEventListener('click', e => {
 });
 
 const catIcon   = { medical:'🏥', grocery:'🛒', cleaning:'🧹', transport:'🚗', other:'💬' };
+
+let userLat = null;
+let userLng = null;
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+navigator.geolocation?.getCurrentPosition(
+  pos => { userLat = pos.coords.latitude; userLng = pos.coords.longitude; },
+  () => {}
+);
 const priBar    = { urgent:'#dc2626', medium:'var(--warning)', low:'var(--success)' };
 const priBadge  = {
   urgent: '<span class="badge priority-urgent">🔴 Urgent</span>',
@@ -95,7 +111,17 @@ async function loadPendingMissions() {
     document.getElementById('missions-list').innerHTML = '<div style="text-align:center;padding:32px 20px;color:var(--muted)"><div style="font-size:2rem;margin-bottom:8px">🎉</div><p>Tout est à jour !</p></div>';
     return;
   }
-  document.getElementById('missions-list').innerHTML = requests.map(r => missionCard(r)).join('');
+
+  // Sort by distance if geolocation available
+  let sorted = requests;
+  if (userLat !== null) {
+    sorted = requests.map(r => ({
+      ...r,
+      _dist: (r.latitude && r.longitude) ? haversineKm(userLat, userLng, r.latitude, r.longitude) : Infinity
+    })).sort((a, b) => a._dist - b._dist);
+  }
+
+  document.getElementById('missions-list').innerHTML = sorted.map(r => missionCard(r)).join('');
 }
 
 // ── My accepted / in-progress missions ──

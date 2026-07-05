@@ -5,10 +5,12 @@ class AssignmentCreate(BaseModel):
     eta_minutes: int = Field(..., ge=0, description="Estimated arrival time in minutes")
 
 class AssignmentLocationUpdate(BaseModel):
-    """Used to validate incoming WebSocket location payloads."""
     lat:       float
     lng:       float
     timestamp: str
+
+class WithdrawBody(BaseModel):
+    reason: str = Field(..., min_length=10, description="Why the volunteer is withdrawing")
 
 class AssignmentOut(BaseModel):
     id:                    int
@@ -19,6 +21,7 @@ class AssignmentOut(BaseModel):
     completed_at:          datetime | None
     volunteer_current_lat: float | None
     volunteer_current_lng: float | None
+    meeting_code:          str | None
 
     class Config:
         from_attributes = True

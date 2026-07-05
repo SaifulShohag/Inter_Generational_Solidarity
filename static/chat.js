@@ -464,11 +464,20 @@ if (recognition) {
 // ── Init: load sessions from server, open most recent active one or start new ──
 (async function init() {
   const params = new URLSearchParams(window.location.search);
+
   if (params.get('mode') === 'voice') {
     setTimeout(() => { if (recognition) micBtn.click(); }, 800);
   }
 
-  // Always get session list fresh from the server — no localStorage for session state
+  // If a specific session was requested (from "Voir la conversation"), load it directly
+  const sessionParam = params.get('session');
+  if (sessionParam) {
+    await loadSessions();
+    await loadSession(sessionParam);
+    return;
+  }
+
+  // Otherwise find the most recent active session from server
   const sessions = await loadSessions();
   const active   = sessions?.find(s => s.status === 'active');
 
@@ -477,4 +486,4 @@ if (recognition) {
   } else {
     await startNewSession();
   }
-})(); 
+})();
