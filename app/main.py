@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.database import engine, Base
 from app.routers import auth, conversations, location, reviews
-from app.routers import help_requests   # explicit import avoids shadowing stdlib 'requests'
+from app.routers import help_requests
 from fastapi.staticfiles import StaticFiles
 
 if sys.platform == "win32":
