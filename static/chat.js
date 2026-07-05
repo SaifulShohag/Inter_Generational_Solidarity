@@ -463,24 +463,27 @@ if (recognition) {
 
 // ── Init: load sessions from server, open right one or start new ──
 (async function init() {
-  const params    = new URLSearchParams(window.location.search);
-  const sessionParam = params.get('session');
+  const params = new URLSearchParams(window.location.search);
 
   if (params.get('mode') === 'voice') {
     setTimeout(() => { if (recognition) micBtn.click(); }, 800);
   }
 
-  const sessions = await loadSessions();
-
+  // If a specific session was requested (from "Voir la conversation"), load it directly
+  const sessionParam = params.get('session');
   if (sessionParam) {
-    // Opened from help-history with a specific session — load it directly
+    await loadSessions();
     await loadSession(sessionParam);
+    return;
+  }
+
+  // Otherwise find the most recent active session from server
+  const sessions = await loadSessions();
+  const active   = sessions?.find(s => s.status === 'active');
+
+  if (active) {
+    await loadSession(active.session_id);
   } else {
-    const active = sessions?.find(s => s.status === 'active');
-    if (active) {
-      await loadSession(active.session_id);
-    } else {
-      await startNewSession();
-    }
+    await startNewSession();
   }
 })();

@@ -1,14 +1,22 @@
+import secrets
+import string
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from app.dependencies import get_db, get_current_user
 from app.models.user import User, UserRole
 from app.models.help_request import HelpRequest, RequestStatus
 from app.models.assignment import VolunteerAssignment
 from app.schemas.help_request import HelpRequestOut
-from app.schemas.assignment import AssignmentCreate, AssignmentOut
+from app.schemas.assignment import AssignmentCreate, AssignmentOut, WithdrawBody
 
 router = APIRouter(prefix="/requests", tags=["Help Requests"])
+
+
+def _gen_code() -> str:
+    alphabet = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(6))
+
 
 @router.get("", response_model=list[HelpRequestOut])
 async def list_requests(
@@ -31,6 +39,7 @@ async def list_requests(
     )
     return result.scalars().all()
 
+
 @router.get("/mine", response_model=list[HelpRequestOut])
 async def my_requests(
     db: AsyncSession = Depends(get_db),
@@ -42,6 +51,7 @@ async def my_requests(
         .order_by(HelpRequest.created_at.desc())
     )
     return result.scalars().all()
+
 
 @router.get("/{request_id}")
 async def get_request(
@@ -60,6 +70,7 @@ async def get_request(
         "assignment": AssignmentOut.model_validate(assignment).model_dump() if assignment else None
     }
 
+
 @router.post("/{request_id}/accept", response_model=AssignmentOut)
 async def accept_request(
     request_id: int,
@@ -76,12 +87,45 @@ async def accept_request(
     assignment = VolunteerAssignment(
         request_id=request_id,
         volunteer_id=current_user.id,
-        eta_minutes=body.eta_minutes
+        eta_minutes=body.eta_minutes,
+        meeting_code=_gen_code(),
     )
     db.add(assignment)
     await db.commit()
     await db.refresh(assignment)
     return assignment
+
+
+@router.post("/{request_id}/withdraw", response_model=HelpRequestOut)
+async def withdraw_request(
+    request_id: int,
+    body: WithdrawBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Volunteer withdraws from an accepted mission — it goes back to pending for others."""
+    if current_user.role != UserRole.VOLUNTEER:
+        raise HTTPException(403, "Only volunteers can withdraw from a request")
+    req = await db.get(HelpRequest, request_id)
+    if not req:
+        raise HTTPException(404, "Request not found")
+    assignment = (await db.execute(
+        select(VolunteerAssignment).where(VolunteerAssignment.request_id == request_id)
+    )).scalar_one_or_none()
+    if not assignment or assignment.volunteer_id != current_user.id:
+        raise HTTPException(403, "You are not assigned to this request")
+    if req.status not in (RequestStatus.ACCEPTED, RequestStatus.IN_PROGRESS):
+        raise HTTPException(400, f"Cannot withdraw from a {req.status.value} request")
+
+    await db.execute(
+        delete(VolunteerAssignment).where(VolunteerAssignment.request_id == request_id)
+    )
+    req.status = RequestStatus.PENDING
+    req.cancellation_reason = f"Bénévole retiré : {body.reason}"
+    await db.commit()
+    await db.refresh(req)
+    return req
+
 
 @router.post("/{request_id}/complete", response_model=HelpRequestOut)
 async def complete_request(
@@ -93,13 +137,12 @@ async def complete_request(
     if not req:
         raise HTTPException(404, "Request not found")
 
-    # Only the assigned volunteer OR the original requester can mark complete
     assignment = (await db.execute(
         select(VolunteerAssignment).where(VolunteerAssignment.request_id == request_id)
     )).scalar_one_or_none()
 
     is_requester = req.requester_id == current_user.id
-    is_volunteer  = assignment is not None and assignment.volunteer_id == current_user.id
+    is_volunteer = assignment is not None and assignment.volunteer_id == current_user.id
 
     if not is_requester and not is_volunteer:
         raise HTTPException(403, "Not authorized to complete this request")
@@ -109,12 +152,14 @@ async def complete_request(
     await db.refresh(req)
     return req
 
+
 @router.post("/{request_id}/cancel", response_model=HelpRequestOut)
 async def cancel_request(
     request_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Senior cancels their own request. If already assigned, the assignment is removed."""
     req = await db.get(HelpRequest, request_id)
     if not req:
         raise HTTPException(404, "Request not found")
@@ -122,6 +167,11 @@ async def cancel_request(
         raise HTTPException(403, "Only the requester can cancel")
     if req.status in (RequestStatus.COMPLETED, RequestStatus.CANCELLED):
         raise HTTPException(400, f"Cannot cancel a {req.status.value} request")
+
+    # Remove any existing assignment so the volunteer history is clean
+    await db.execute(
+        delete(VolunteerAssignment).where(VolunteerAssignment.request_id == request_id)
+    )
     req.status = RequestStatus.CANCELLED
     await db.commit()
     await db.refresh(req)

@@ -46,14 +46,15 @@ class HelpRequest(Base):
         default=RequestStatus.PENDING,
         index=True
     )
-    created_at:    Mapped[datetime]        = mapped_column(
+    created_at:           Mapped[datetime]        = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)
     )
-    updated_at:    Mapped[datetime]        = mapped_column(
+    updated_at:           Mapped[datetime]        = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc)
     )
+    cancellation_reason:  Mapped[str | None]      = mapped_column(Text)
 
 # Reliable updated_at — works on SQLite unlike server-side onupdate=func.now()
 @event.listens_for(HelpRequest, "before_update")

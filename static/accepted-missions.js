@@ -68,7 +68,7 @@ function render() {
     const bar = priBar[r.priority]   || priBar.medium;
     const dt  = new Date(r.scheduled_at).toLocaleDateString('fr-FR', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
 
-    const actions = buildActions(r);
+    const actions = buildActions(r, allMissions.find(m => m.r.id === r.id)?.assignment);
 
     return `
     <div class="mission-card animate-slide">
@@ -95,12 +95,29 @@ function render() {
   document.getElementById('count-label').textContent = `${allMissions.length} mission${allMissions.length !== 1 ? 's' : ''} acceptée${allMissions.length !== 1 ? 's' : ''} au total`;
 }
 
+function meetingCodeHtml(code) {
+  if (!code) return '';
+  return `
+    <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:2px solid #0ea5e9;border-radius:12px;padding:12px 14px;text-align:center;margin-bottom:10px">
+      <p style="font-size:.72rem;font-weight:700;color:#0369a1;letter-spacing:.1em;margin-bottom:4px">🤝 CODE DE RENCONTRE</p>
+      <p style="font-size:1.7rem;font-weight:800;letter-spacing:.2em;color:#0c4a6e;font-family:monospace;margin:0">${code}</p>
+    </div>`;
+}
+
 // ── Build footer actions per status ──
-function buildActions(r) {
+function buildActions(r, assignment) {
   if (r.status === 'accepted' || r.status === 'in_progress') {
     return `
-      <a class="btn btn-ghost btn-sm" href="/mission-detail.html?id=${r.id}">Détails →</a>
-      <button class="btn btn-success btn-sm" style="flex:1" id="complete-${r.id}">✅ Marquer terminée</button>`;
+      ${meetingCodeHtml(assignment?.meeting_code)}
+      <div style="display:flex;gap:8px;width:100%">
+        <a class="btn btn-ghost btn-sm" href="/mission-detail.html?id=${r.id}">Détails →</a>
+        <button class="btn btn-success btn-sm" style="flex:1" id="complete-${r.id}">✅ Marquer terminée</button>
+      </div>
+      <div id="withdraw-area-${r.id}" style="width:100%;margin-top:6px">
+        <button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5;width:100%" id="withdraw-toggle-${r.id}">
+          Je ne peux plus faire cette mission
+        </button>
+      </div>`;
   }
   if (r.status === 'completed') {
     if (reviewedRequestIds.has(r.id)) {
@@ -127,6 +144,11 @@ function bindFooterButtons(reqId, status) {
   const completeBtn = document.getElementById(`complete-${reqId}`);
   if (completeBtn) {
     completeBtn.addEventListener('click', () => completeRequest(reqId));
+  }
+
+  const withdrawToggle = document.getElementById(`withdraw-toggle-${reqId}`);
+  if (withdrawToggle) {
+    withdrawToggle.addEventListener('click', () => showWithdrawForm(reqId));
   }
 
   const stars     = document.querySelectorAll(`#stars-${reqId} .star-r`);
@@ -186,6 +208,49 @@ async function submitReview(reqId, rating, btn) {
   } else {
     btn.disabled = false;
     btn.textContent = 'Envoyer';
+  }
+}
+
+// ── Withdraw from mission ──
+function showWithdrawForm(reqId) {
+  const area = document.getElementById(`withdraw-area-${reqId}`);
+  if (!area) return;
+  area.innerHTML = `
+    <div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:12px;padding:12px;margin-top:4px">
+      <p style="font-size:.83rem;font-weight:600;color:#dc2626;margin-bottom:8px">Expliquez pourquoi vous vous retirez :</p>
+      <textarea id="withdraw-reason-${reqId}" rows="3" placeholder="Ex : Je suis malade, je ne peux pas venir..." style="width:100%;border:1px solid #fca5a5;border-radius:8px;padding:8px;font-size:.88rem;resize:vertical;box-sizing:border-box"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-ghost btn-sm" onclick="render()">Annuler</button>
+        <button class="btn btn-sm" style="background:#dc2626;color:#fff;flex:1" id="withdraw-confirm-${reqId}">Confirmer</button>
+      </div>
+    </div>`;
+  document.getElementById(`withdraw-confirm-${reqId}`).addEventListener('click', () => withdrawMission(reqId));
+}
+
+async function withdrawMission(reqId) {
+  const reason = document.getElementById(`withdraw-reason-${reqId}`)?.value?.trim();
+  if (!reason || reason.length < 10) {
+    alert("Veuillez écrire une explication d'au moins 10 caractères.");
+    return;
+  }
+  const btn = document.getElementById(`withdraw-confirm-${reqId}`);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const res = await fetch(`${API}/requests/${reqId}/withdraw`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ reason })
+  });
+
+  if (res.ok) {
+    allMissions = allMissions.filter(({ r }) => r.id !== reqId);
+    render();
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Confirmer';
+    const err = await res.json().catch(() => ({}));
+    alert(err.detail || 'Erreur lors du retrait.');
   }
 }
 

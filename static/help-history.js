@@ -24,6 +24,29 @@ const priorityCfg = {
   urgent: { label:'🔴 Urgente', cls:'priority-urgent' },
 };
 
+const ACTIVE_STATUSES = ['pending', 'accepted', 'in_progress'];
+const PAST_STATUSES   = ['completed', 'cancelled'];
+
+const urlParams = new URLSearchParams(window.location.search);
+let activeTab   = urlParams.get('tab') === 'past' ? 'past' : 'active';
+
+let allItems           = [];
+let reviewedRequestIds = new Set();
+let assignmentMap      = {};
+let sessionMap         = {};
+
+function setTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  render();
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => setTab(btn.dataset.tab));
+});
+
 function starWidget(reqId) {
   return `
     <div id="review-box-${reqId}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -75,64 +98,69 @@ function wireStars(reqId) {
   }
 }
 
-async function load() {
-  // Fetch requests, already-submitted reviews, and sessions — all in parallel
-  const [reqRes, revRes, sessRes] = await Promise.all([
-    fetch(`${API}/requests/mine`,                                  { headers: { Authorization: `Bearer ${token}` } }),
-    fetch(`${API}/users/${userId}/reviews?as_reviewer=true`,       { headers: { Authorization: `Bearer ${token}` } }),
-    fetch(`${API}/conversations`,                                  { headers: { Authorization: `Bearer ${token}` } }),
-  ]);
+function meetingCodeHtml(code) {
+  if (!code) return '';
+  return `
+    <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:2px solid #0ea5e9;border-radius:12px;padding:12px 14px;text-align:center;margin-bottom:10px">
+      <p style="font-size:.72rem;font-weight:700;color:#0369a1;letter-spacing:.1em;margin-bottom:4px">🤝 CODE DE RENCONTRE</p>
+      <p style="font-size:1.7rem;font-weight:800;letter-spacing:.2em;color:#0c4a6e;font-family:monospace;margin:0">${code}</p>
+      <p style="font-size:.72rem;color:#0369a1;margin-top:4px">Demandez ce code à votre bénévole pour confirmer la mise en relation</p>
+    </div>`;
+}
 
-  if (!reqRes.ok) {
-    document.getElementById('list').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Impossible de charger les demandes.</p></div>';
-    return;
-  }
-
-  const items    = await reqRes.json();
-  const myReviews = revRes.ok ? await revRes.json() : [];
-  const sessions  = sessRes.ok ? await sessRes.json() : [];
-
-  // Map requestId → sessionId for the "View conversation" link
-  const reqToSession = {};
-  sessions.forEach(s => { if (s.request_id) reqToSession[s.request_id] = s.session_id; });
-
-  const reviewedRequestIds = new Set(myReviews.map(rv => rv.request_id));
+function render() {
+  const statuses = activeTab === 'active' ? ACTIVE_STATUSES : PAST_STATUSES;
+  const filtered = allItems.filter(r => statuses.includes(r.status));
 
   const label = document.getElementById('count-label');
-  const done  = items.filter(i => i.status === 'completed').length;
-  label.textContent = `${done} fois aidée · ${items.length} demande${items.length !== 1 ? 's' : ''} au total`;
-
-  if (!items.length) {
-    document.getElementById('list').innerHTML = '<div class="empty-state"><div class="icon">🌱</div><p style="font-size:1.1rem;font-weight:700;margin-bottom:8px">Aucune demande pour l\'instant</p><p>Votre première demande apparaîtra ici</p></div>';
-    return;
+  if (activeTab === 'active') {
+    label.textContent = `${filtered.length} demande${filtered.length !== 1 ? 's' : ''} en cours`;
+  } else {
+    const done = filtered.filter(r => r.status === 'completed').length;
+    label.textContent = `${done} fois aidée · ${filtered.length} demande${filtered.length !== 1 ? 's' : ''} passée${filtered.length !== 1 ? 's' : ''}`;
   }
 
   const list   = document.getElementById('list');
   list.innerHTML = '';
   const toWire = [];
 
-  items.forEach(r => {
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="icon">${activeTab === 'active' ? '🌱' : '📚'}</div>
+      <p style="font-size:1.1rem;font-weight:700;margin-bottom:8px">${activeTab === 'active' ? 'Aucune demande en cours' : 'Aucune demande passée'}</p>
+      <p>${activeTab === 'active' ? 'Créez une demande via le chat' : 'Vos demandes terminées apparaîtront ici'}</p>
+    </div>`;
+    return;
+  }
+
+  filtered.forEach(r => {
     const sc  = statusCfg[r.status]     || statusCfg.pending;
     const pc  = priorityCfg[r.priority] || priorityCfg.medium;
     const ic  = catIcon[r.category]     || '💬';
     const dt  = new Date(r.scheduled_at).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
     const created = new Date(r.created_at).toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
-
-    // Get the session for this request to link directly to the right conversation
-    const sessionId = reqToSession[r.id];
-    const chatLink  = sessionId
-      ? `/chat.html?session=${sessionId}`
-      : '/chat.html';
+    const assignment = assignmentMap[r.id];
+    const sessionId  = sessionMap[r.id];
+    const chatUrl    = sessionId ? `/chat.html?session=${sessionId}` : '/chat.html';
 
     let footer = '';
     if (r.status === 'completed') {
       footer = reviewedRequestIds.has(r.id) ? alreadyReviewedHtml() : starWidget(r.id);
       if (!reviewedRequestIds.has(r.id)) toWire.push(r.id);
-    } else if (['pending','accepted','in_progress'].includes(r.status)) {
-      footer = `<button class="continue-btn" onclick="window.location.href='${chatLink}'">💬 Voir la conversation</button>`;
+    } else if (['accepted', 'in_progress'].includes(r.status)) {
+      footer = `
+        ${meetingCodeHtml(assignment?.meeting_code)}
+        <button class="continue-btn" onclick="window.location.href='${chatUrl}'">💬 Voir la conversation</button>`;
+    } else if (r.status === 'pending') {
+      footer = `
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="continue-btn" onclick="window.location.href='${chatUrl}'">💬 Voir la conversation</button>
+          <button class="btn btn-ghost btn-sm" style="color:#dc2626;border-color:#fca5a5" id="cancel-btn-${r.id}">Annuler la demande</button>
+        </div>`;
     }
 
     const card = document.createElement('div');
+    card.id = `card-${r.id}`;
     card.className = 'hist-item animate-slide';
     card.innerHTML = `
       <div class="status-bar" style="background:${sc.bar}"></div>
@@ -158,6 +186,68 @@ async function load() {
   });
 
   toWire.forEach(id => wireStars(id));
+
+  filtered.filter(r => r.status === 'pending').forEach(r => {
+    const btn = document.getElementById(`cancel-btn-${r.id}`);
+    if (btn) btn.addEventListener('click', () => cancelRequest(r.id));
+  });
+}
+
+async function load() {
+  const [reqRes, revRes, sesRes] = await Promise.all([
+    fetch(`${API}/requests/mine`, { headers: { Authorization: `Bearer ${token}` } }),
+    fetch(`${API}/users/${userId}/reviews?as_reviewer=true`, { headers: { Authorization: `Bearer ${token}` } }),
+    fetch(`${API}/conversations`, { headers: { Authorization: `Bearer ${token}` } }),
+  ]);
+
+  if (!reqRes.ok) {
+    document.getElementById('list').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Impossible de charger les demandes.</p></div>';
+    return;
+  }
+
+  allItems = await reqRes.json();
+  const myReviews = revRes.ok ? await revRes.json() : [];
+  reviewedRequestIds = new Set(myReviews.map(rv => rv.request_id));
+
+  if (sesRes.ok) {
+    const sessions = await sesRes.json();
+    sessions.forEach(s => { if (s.request_id) sessionMap[s.request_id] = s.session_id; });
+  }
+
+  await Promise.all(
+    allItems
+      .filter(r => ['accepted', 'in_progress'].includes(r.status))
+      .map(async r => {
+        try {
+          const d = await fetch(`${API}/requests/${r.id}`, { headers: { Authorization: `Bearer ${token}` } });
+          if (d.ok) {
+            const { assignment } = await d.json();
+            if (assignment) assignmentMap[r.id] = assignment;
+          }
+        } catch {}
+      })
+  );
+
+  setTab(activeTab);
+}
+
+async function cancelRequest(reqId) {
+  if (!confirm('Êtes-vous sûr de vouloir annuler cette demande ?')) return;
+  const btn = document.getElementById(`cancel-btn-${reqId}`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner spinner-dark"></span>'; }
+
+  const res = await fetch(`${API}/requests/${reqId}/cancel`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (res.ok) {
+    allItems = allItems.filter(r => r.id !== reqId);
+    render();
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = 'Annuler la demande'; }
+    const err = await res.json().catch(() => ({}));
+    alert(err.detail || 'Impossible d\'annuler cette demande.');
+  }
 }
 
 load();
