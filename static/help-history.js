@@ -76,10 +76,11 @@ function wireStars(reqId) {
 }
 
 async function load() {
-  // Fetch requests and already-submitted reviews in parallel
-  const [reqRes, revRes] = await Promise.all([
-    fetch(`${API}/requests/mine`, { headers: { Authorization: `Bearer ${token}` } }),
-    fetch(`${API}/users/${userId}/reviews?as_reviewer=true`, { headers: { Authorization: `Bearer ${token}` } }),
+  // Fetch requests, already-submitted reviews, and sessions — all in parallel
+  const [reqRes, revRes, sessRes] = await Promise.all([
+    fetch(`${API}/requests/mine`,                                  { headers: { Authorization: `Bearer ${token}` } }),
+    fetch(`${API}/users/${userId}/reviews?as_reviewer=true`,       { headers: { Authorization: `Bearer ${token}` } }),
+    fetch(`${API}/conversations`,                                  { headers: { Authorization: `Bearer ${token}` } }),
   ]);
 
   if (!reqRes.ok) {
@@ -89,7 +90,12 @@ async function load() {
 
   const items    = await reqRes.json();
   const myReviews = revRes.ok ? await revRes.json() : [];
-  // Set of request_ids already reviewed by this user
+  const sessions  = sessRes.ok ? await sessRes.json() : [];
+
+  // Map requestId → sessionId for the "View conversation" link
+  const reqToSession = {};
+  sessions.forEach(s => { if (s.request_id) reqToSession[s.request_id] = s.session_id; });
+
   const reviewedRequestIds = new Set(myReviews.map(rv => rv.request_id));
 
   const label = document.getElementById('count-label');
@@ -112,12 +118,18 @@ async function load() {
     const dt  = new Date(r.scheduled_at).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
     const created = new Date(r.created_at).toLocaleDateString('fr-FR', { day:'numeric', month:'short' });
 
+    // Get the session for this request to link directly to the right conversation
+    const sessionId = reqToSession[r.id];
+    const chatLink  = sessionId
+      ? `/chat.html?session=${sessionId}`
+      : '/chat.html';
+
     let footer = '';
     if (r.status === 'completed') {
       footer = reviewedRequestIds.has(r.id) ? alreadyReviewedHtml() : starWidget(r.id);
       if (!reviewedRequestIds.has(r.id)) toWire.push(r.id);
     } else if (['pending','accepted','in_progress'].includes(r.status)) {
-      footer = `<button class="continue-btn" onclick="window.location.href='/chat.html'">💬 Voir la conversation</button>`;
+      footer = `<button class="continue-btn" onclick="window.location.href='${chatLink}'">💬 Voir la conversation</button>`;
     }
 
     const card = document.createElement('div');

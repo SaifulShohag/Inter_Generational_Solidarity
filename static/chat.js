@@ -461,20 +461,26 @@ if (recognition) {
   micBtn.disabled = true;
 }
 
-// ── Init: load sessions from server, open most recent active one or start new ──
+// ── Init: load sessions from server, open right one or start new ──
 (async function init() {
-  const params = new URLSearchParams(window.location.search);
+  const params    = new URLSearchParams(window.location.search);
+  const sessionParam = params.get('session');
+
   if (params.get('mode') === 'voice') {
     setTimeout(() => { if (recognition) micBtn.click(); }, 800);
   }
 
-  // Always get session list fresh from the server — no localStorage for session state
   const sessions = await loadSessions();
-  const active   = sessions?.find(s => s.status === 'active');
 
-  if (active) {
-    await loadSession(active.session_id);
+  if (sessionParam) {
+    // Opened from help-history with a specific session — load it directly
+    await loadSession(sessionParam);
   } else {
-    await startNewSession();
+    const active = sessions?.find(s => s.status === 'active');
+    if (active) {
+      await loadSession(active.session_id);
+    } else {
+      await startNewSession();
+    }
   }
-})(); 
+})();
