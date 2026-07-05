@@ -34,7 +34,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # allow_credentials=True requires explicit origins (not ["*"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=[o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,4 +53,4 @@ async def health():
     return {"status": "ok"}
 
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/", StaticFiles(directory="static", html=True), name="static") 

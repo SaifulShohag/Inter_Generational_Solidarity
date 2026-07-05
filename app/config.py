@@ -1,5 +1,4 @@
-from typing import List
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 
 
@@ -34,19 +33,13 @@ class Settings(BaseSettings):
     CONVERSATION_SECRET_KEY: str = ""
 
     # ── Security ──────────────────────────────────────────────────────────────
-    # Comma-separated origins: ALLOWED_ORIGINS=http://localhost:8000,https://yourdomain.com
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:8000"]
-    HTTPS_ENABLED:   bool = False  # Set True behind HTTPS in production (enables Secure cookie)
-
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def _parse_origins(cls, v):
-        if isinstance(v, str):
-            return [o.strip() for o in v.split(",") if o.strip()]
-        return v
+    # Comma-separated origins string — parsed into a list in main.py
+    # Example: ALLOWED_ORIGINS=http://localhost:8000,https://yourdomain.com
+    ALLOWED_ORIGINS: str = "http://localhost:8000"
+    HTTPS_ENABLED:   bool = False  # Set True only if your app itself terminates TLS
 
     class Config:
         env_file = ".env"
 
 
-settings = Settings()  # type: ignore
+settings = Settings()  # type: ignore 
