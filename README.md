@@ -1,5 +1,5 @@
-# Inter-GenAIrational Solidarity — VibeForAll
-
+# Inter-GenAIrational Solidarity — VibeForAll_Hackaton
+Live at https://inter-generational-solidarity.onrender.com
 > Connecting seniors with local volunteers through AI-powered conversations.
 
 ---
