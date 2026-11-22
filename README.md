@@ -1,6 +1,9 @@
 # Inter-GenAIrational Solidarity — VibeForAll_Hackaton
 Live at https://inter-generational-solidarity.onrender.com
-> Connecting seniors with local volunteers through AI-powered conversations.
+
+> Hackathon MVP built over 2–3 days at the VibeForAll Hi! PARIS hackathon.
+>
+> Connecting seniors with local volunteers through AI-powered, fully voice-enabled conversations.
 
 ---
 
